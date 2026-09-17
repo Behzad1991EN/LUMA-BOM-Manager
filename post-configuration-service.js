@@ -3,12 +3,16 @@
 (function initializePostConfiguration(global) {
   const text = value => String(value ?? '').trim();
   const normalized = value => text(value).toLowerCase().replace(/\s+/g, ' ');
+  const pileKind = value => {
+    const kind = normalized(value);
+    return kind === 'main post' ? 'drive pile' : kind === 'bearing post' ? 'bearing pile' : kind;
+  };
 
   function activePostParts(parts, postKind='') {
     return (parts || []).filter(part => part?.Active !== false
       && text(part?.TAG)
       && text(part?.['Post Kind'])
-      && (!postKind || normalized(part['Post Kind']) === normalized(postKind)));
+      && (!postKind || pileKind(part['Post Kind']) === pileKind(postKind)));
   }
 
   function profileOptions(parts, postKind) {
@@ -16,8 +20,8 @@
       .sort((a, b) => a.localeCompare(b, undefined, {numeric:true}));
   }
 
-  function depthOptions(parts) {
-    return [...new Set(activePostParts(parts).map(part => Number(part['Foundation Depth mm'])).filter(Number.isFinite))]
+  function depthOptions(parts, postKind) {
+    return [...new Set(activePostParts(parts, postKind).map(part => Number(part['Foundation Depth mm'])).filter(depth => Number.isFinite(depth) && depth > 0))]
       .sort((a, b) => a - b).map(String);
   }
 
@@ -35,17 +39,18 @@
 
   function selection(project, postKind) {
     const inputs = project?.inputs || {};
+    const drivePile = pileKind(postKind) === 'drive pile';
     return {
       postKind,
       foundationMethod:inputs.foundation_method,
-      foundationDepthMm:inputs.foundation_depth_mm,
-      profileType:postKind === 'Main Post' ? inputs.main_post_profile : inputs.bearing_post_profile,
+      foundationDepthMm:(drivePile ? inputs.drive_pile_depth_mm : inputs.bearing_pile_depth_mm) ?? inputs.foundation_depth_mm,
+      profileType:drivePile ? inputs.main_post_profile : inputs.bearing_post_profile,
     };
   }
 
   function missingMessage(value, postKind) {
     const item = value?.postKind ? value : selection(value, postKind);
-    return `No ${item.postKind || postKind || 'post'} is configured for ${item.foundationMethod || 'the selected foundation method'}, ${item.foundationDepthMm || 'the selected depth'} mm, and ${item.profileType || 'the selected profile'}.`;
+    return `No ${item.postKind || postKind || 'pile'} is configured for ${item.foundationMethod || 'the selected foundation method'}, ${item.foundationDepthMm || 'the selected depth'} mm, and ${item.profileType || 'the selected profile'}.`;
   }
 
   function ambiguityMessage() {
@@ -54,8 +59,8 @@
 
   function validate(project, parts) {
     const matches = {}, errors = [];
-    for (const postKind of ['Main Post', 'Bearing Post']) {
-      const key = postKind === 'Main Post' ? 'main' : 'bearing';
+    for (const postKind of ['Drive Pile', 'Bearing Pile']) {
+      const key = postKind === 'Drive Pile' ? 'main' : 'bearing';
       const item = selection(project, postKind);
       const result = resolveResult(parts, item);
       matches[key] = result.part;

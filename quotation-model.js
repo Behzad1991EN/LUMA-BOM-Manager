@@ -87,7 +87,7 @@
     const activeRows = analysis?.active || [];
     const kpis = analysis?.kpis || {};
     const quantityByTags = tags => bomRows.reduce((sum, row) => tags.includes(String(row.TAG || '').toLowerCase()) ? sum + number(row['Total Qty']) : sum, 0);
-    const postRows = bomRows.filter(row => /mainpost|bearingpost/.test(String(row['Part Name'] || row.Part || '').toLowerCase().replace(/\s+/g, '')));
+    const postRows = bomRows.filter(row => /mainpost|bearingpost|drivepile|bearingpile/.test(String(row['Part Name'] || row.Part || '').toLowerCase().replace(/\s+/g, '')));
     const bomPileCount = postRows.reduce((sum, row) => sum + number(row['Total Qty']), 0);
     const hasCompletePileSchedule = activeRows.length > 0 && activeRows.every(row => numberOrNull(row['Number of Trackers']) !== null && numberOrNull(row['Bearing Posts / Tracker']) !== null);
     const scheduledPileCount = activeRows.reduce((sum, row) => sum + number(row['Number of Trackers']) * (1 + number(row['Bearing Posts / Tracker'])), 0);
@@ -117,7 +117,7 @@
       modulePowerWp:numberOrNull(inputs.pv_power),
       trackerLengthM,
       trackerHeightM:numberOrNull(inputs.tracker_height_m),
-      foundationDepthM:numberOrNull(inputs.foundation_depth_mm) === null ? null : number(inputs.foundation_depth_mm) / 1000,
+      foundationDepthM:numberOrNull(inputs.drive_pile_depth_mm ?? inputs.foundation_depth_mm) === null ? null : number(inputs.drive_pile_depth_mm ?? inputs.foundation_depth_mm) / 1000,
       maximumTrackingTilt:numberOrNull(inputs.max_tracking_tilt_deg),
       groundClearanceM:numberOrNull(inputs.ground_clearance_m),
       pitchDistance:numberOrNull(inputs.pitch_m),
@@ -160,7 +160,7 @@
       trackerLengthM,
       trackerHeightM: numberOrNull(inputs.tracker_height_m),
       foundationMethod: inputs.foundation_method || inputs.foundation_type || '',
-      foundationDepthMm: numberOrNull(inputs.foundation_depth_mm),
+      foundationDepthMm: numberOrNull(inputs.drive_pile_depth_mm ?? inputs.foundation_depth_mm),
       maxTrackingTiltDeg: numberOrNull(inputs.max_tracking_tilt_deg),
       groundClearanceM: numberOrNull(inputs.ground_clearance_m),
       pitchM: numberOrNull(inputs.pitch_m),

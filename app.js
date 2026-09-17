@@ -316,6 +316,9 @@ function normalizeProject(raw,id){
   const p=makeProject(String(raw?.project_name||'Untitled Project'),String(raw?.project_code||raw?.inputs?.project_code||''));
   p.project_id=String(raw?.project_id||id||uuid());
   const rawInputs=raw?.inputs||{};p.inputs={...clone(E.DEFAULT_INPUTS),...rawInputs}; delete p.inputs.project_code;
+  p.inputs.drive_pile_depth_mm=String(rawInputs.drive_pile_depth_mm??rawInputs.foundation_depth_mm??E.DEFAULT_INPUTS.drive_pile_depth_mm);
+  p.inputs.bearing_pile_depth_mm=String(rawInputs.bearing_pile_depth_mm??rawInputs.foundation_depth_mm??E.DEFAULT_INPUTS.bearing_pile_depth_mm);
+  delete p.inputs.foundation_depth_mm;
   if(!raw?.inputs?.foundation_method)p.inputs.foundation_method=String(raw?.inputs?.foundation_type||'Ramming')==='Ramming'?'Ramming':'Foundation';
   p.inputs.foundation_type=p.inputs.foundation_method;
   const legacyDestination=String(rawInputs.destination_country??rawInputs.project_country??'').trim();
@@ -536,7 +539,7 @@ function bindStandardInputs(container){
       }
       if(key==='destination_country'){const canonical=globalThis.LumaCountryData.canonicalEuropeanCountry(el.value);p.inputs.destination_country=canonical||el.value;p.inputs.project_country=p.inputs.destination_country;}
       markDirty();refreshOutputsOnly();
-      if(['foundation_method','foundation_depth_mm','main_post_profile','bearing_post_profile','project_country_type'].includes(key))renderInputsTab();
+      if(['foundation_method','drive_pile_depth_mm','bearing_pile_depth_mm','main_post_profile','bearing_post_profile','project_country_type'].includes(key))renderInputsTab();
     });
   });
 }
@@ -571,21 +574,22 @@ function renderInputsTab(){
     </div>
     <div class="input-section"><h2 class="section-title">Foundation Input</h2>
       ${selectRow('Method','foundation_method',i.foundation_method,['Ramming','Foundation'])}
-      ${selectRow('Depth','foundation_depth_mm',i.foundation_depth_mm,window.LumaPostConfiguration.depthOptions(partMaster))}
-      ${selectRow('Main Post Type','main_post_profile',i.main_post_profile,window.LumaPostConfiguration.profileOptions(partMaster,'Main Post'))}
-      ${selectRow('Bearing Post Type','bearing_post_profile',i.bearing_post_profile,window.LumaPostConfiguration.profileOptions(partMaster,'Bearing Post'))}
+      ${selectRow('Drive Pile Depth (mm)','drive_pile_depth_mm',i.drive_pile_depth_mm,window.LumaPostConfiguration.depthOptions(partMaster,'Drive Pile'))}
+      ${selectRow('Drive Pile Type','main_post_profile',i.main_post_profile,window.LumaPostConfiguration.profileOptions(partMaster,'Drive Pile'))}
+      ${selectRow('Bearing Pile Depth (mm)','bearing_pile_depth_mm',i.bearing_pile_depth_mm,window.LumaPostConfiguration.depthOptions(partMaster,'Bearing Pile'))}
+      ${selectRow('Bearing Pile Type','bearing_post_profile',i.bearing_post_profile,window.LumaPostConfiguration.profileOptions(partMaster,'Bearing Pile'))}
     </div>
-    <div class="input-section"><h2 class="section-title">Main Tube Inputs</h2>
+    <div class="input-section"><h2 class="section-title">Torque Tube Inputs</h2>
       ${inputRow('Overlap A/B (mm)','overlap_ab',i.overlap_ab)}
       ${inputRow('Overlap B/C (mm)','overlap_bc',i.overlap_bc)}
-      ${inputRow('Main Tube A Length - Long Tracker (mm)','main_beam_a_length',i.main_beam_a_length)}
+      ${inputRow('Torque Tube A Length - Long Tracker (mm)','main_beam_a_length',i.main_beam_a_length)}
       ${inputRow('Slew Drive Connection Length - Short Tracker (mm)','main_beam_connection_length',i.main_beam_connection_length)}
-      ${inputRow('Main Tube B Length (mm)','main_beam_b_length',i.main_beam_b_length)}
-      ${inputRow('Main Tube C Short Length (mm)','main_beam_c_short_length',i.main_beam_c_short_length)}
-      ${inputRow('Main Tube C Long Length (mm)','main_beam_c_long_length',i.main_beam_c_long_length)}
-      ${inputRow('Mid Plane to Beginning of Main Tube A / Connection (mm)','mid_plane_to_beam_a',i.mid_plane_to_beam_a)}
+      ${inputRow('Torque Tube B Length (mm)','main_beam_b_length',i.main_beam_b_length)}
+      ${inputRow('Torque Tube C Short Length (mm)','main_beam_c_short_length',i.main_beam_c_short_length)}
+      ${inputRow('Torque Tube C Long Length (mm)','main_beam_c_long_length',i.main_beam_c_long_length)}
+      ${inputRow('Mid Plane to Beginning of Torque Tube A / Connection (mm)','mid_plane_to_beam_a',i.mid_plane_to_beam_a)}
     </div>
-    <div class="input-section"><h2 class="section-title compact">Bearing Post Distance by Array Type</h2><p class="subtitle">Add the bearing modes used for each PV array type. The same PV size can have several modes, each with its own number of trackers.</p><div id="bearingConfig"></div></div>
+    <div class="input-section"><h2 class="section-title compact">Bearing Pile Distance by Array Type</h2><p class="subtitle">Add the bearing modes used for each PV array type. The same PV size can have several modes, each with its own number of trackers.</p><div id="bearingConfig"></div></div>
     <div class="input-section"><h2 class="section-title compact">Manual Standard Parts</h2><p class="subtitle">Use these rows for standard parts that cannot be calculated automatically, such as Datalogger and Safeguard.</p><div id="manualParts"></div></div>`;
   bindStandardInputs(root);
   document.getElementById('input___project_name').addEventListener('input',e=>{p.project_name=e.target.value;markDirty();updateHeaderAndKpis();refreshProjectList();saveRecovery();});
@@ -605,17 +609,17 @@ function syncCustomRuleFromProject(pv,mode=uiState.customRule.mode){
 function customRuleEditorHtml(){
   const r=uiState.customRule;let html='';
   if(r.mode==='Symmetrical'){
-    html+=`<div class="form-row"><label>Identical Distance Between Bearing Posts (mm)</label><input id="crSym" value="${escapeHtml(r.symmetrical_distance)}"><span></span></div>`;
+    html+=`<div class="form-row"><label>Identical Distance Between Bearing Piles (mm)</label><input id="crSym" value="${escapeHtml(r.symmetrical_distance)}"><span></span></div>`;
   }else if(r.mode==='Semi-symmetrical'){
-    html+=`<div class="form-row"><label>Number of Bearing Post Pairs</label><select id="crSemiCount">${[1,2,3,4,5].map(v=>`<option ${v===Number(r.semi_pair_count)?'selected':''}>${v}</option>`).join('')}</select><span></span></div>`;
+    html+=`<div class="form-row"><label>Number of Bearing Pile Pairs</label><select id="crSemiCount">${[1,2,3,4,5].map(v=>`<option ${v===Number(r.semi_pair_count)?'selected':''}>${v}</option>`).join('')}</select><span></span></div>`;
     for(let pair=1;pair<=Number(r.semi_pair_count);pair++){
-      const label=pair===1?'Main Post to Pair ±1 (mm)':`Pair ±${pair-1} to Pair ±${pair} (mm)`;html+=`<div class="form-row"><label>${label}</label><input data-cr-semi="${pair-1}" value="${escapeHtml(r.semi_pair_gaps[pair-1]||'')}"><span></span></div>`;
+      const label=pair===1?'Drive Pile to Pair ±1 (mm)':`Pair ±${pair-1} to Pair ±${pair} (mm)`;html+=`<div class="form-row"><label>${label}</label><input data-cr-semi="${pair-1}" value="${escapeHtml(r.semi_pair_gaps[pair-1]||'')}"><span></span></div>`;
     }
   }else{
-    html+=`<div class="form-row"><label>Number of Bearing Posts Per Side</label><select id="crAsymCount">${[1,2,3,4,5].map(v=>`<option ${v===Number(r.asym_post_count)?'selected':''}>${v}</option>`).join('')}</select><span></span></div><h3 class="section-title compact" style="font-size:15px">North Side</h3>`;
-    for(let pair=1;pair<=Number(r.asym_post_count);pair++){const label=pair===1?'Main Post to North 1 (mm)':`North ${pair-1} to North ${pair} (mm)`;html+=`<div class="form-row"><label>${label}</label><input data-cr-north="${pair-1}" value="${escapeHtml(r.asym_north_gaps[pair-1]||'')}"><span></span></div>`;}
+    html+=`<div class="form-row"><label>Number of Bearing Piles Per Side</label><select id="crAsymCount">${[1,2,3,4,5].map(v=>`<option ${v===Number(r.asym_post_count)?'selected':''}>${v}</option>`).join('')}</select><span></span></div><h3 class="section-title compact" style="font-size:15px">North Side</h3>`;
+    for(let pair=1;pair<=Number(r.asym_post_count);pair++){const label=pair===1?'Drive Pile to North 1 (mm)':`North ${pair-1} to North ${pair} (mm)`;html+=`<div class="form-row"><label>${label}</label><input data-cr-north="${pair-1}" value="${escapeHtml(r.asym_north_gaps[pair-1]||'')}"><span></span></div>`;}
     html+='<h3 class="section-title compact" style="font-size:15px">South Side</h3>';
-    for(let pair=1;pair<=Number(r.asym_post_count);pair++){const label=pair===1?'Main Post to South 1 (mm)':`South ${pair-1} to South ${pair} (mm)`;html+=`<div class="form-row"><label>${label}</label><input data-cr-south="${pair-1}" value="${escapeHtml(r.asym_south_gaps[pair-1]||'')}"><span></span></div>`;}
+    for(let pair=1;pair<=Number(r.asym_post_count);pair++){const label=pair===1?'Drive Pile to South 1 (mm)':`South ${pair-1} to South ${pair} (mm)`;html+=`<div class="form-row"><label>${label}</label><input data-cr-south="${pair-1}" value="${escapeHtml(r.asym_south_gaps[pair-1]||'')}"><span></span></div>`;}
   }
   return html;
 }
@@ -639,7 +643,7 @@ function renderBearingConfig(){
     document.getElementById('crDelete').addEventListener('click',()=>{if(!customRuleSelectedKey){showToast('Select a custom bearing configuration from the table first.');return;}const selected=parseBearingConfigurationSelectionKey(customRuleSelectedKey),variants=E.getBearingRuleVariantsForPv(p,selected.pv),removed=variants.find(rule=>rule.key===selected.key);if(!removed){showToast('The selected configuration is no longer available.');return;}if(!confirm(`Delete the ${removed.mode} configuration for ${selected.pv}-PV?`))return;const remaining=variants.filter(rule=>rule.key!==selected.key);if(remaining.length){p.bearing_rules[String(selected.pv)]=bearingRuleStoreFromVariants(remaining);updateTrackerQuantityFromBearingRules(p,selected.pv);}else{delete p.bearing_rules[String(selected.pv)];p.tracker_quantities[String(selected.pv)]=removed.quantity;}customRuleSelectedKey=null;syncCustomRuleFromProject(selected.pv,removed.mode);markDirty();refreshOutputsOnly();renderBearingConfig();});
     renderBearingSummaryOnly();
   }else{
-    const maxSpan=iValue('max_span_length',p.inputs.max_span_length);const limits=E.getSpanLimits(p);root.innerHTML=`<div class="bearing-top"><label>Array Type</label><select disabled><option>${escapeHtml(uiState.customRule.pv)}</option></select><label>Mode</label><strong>Symmetrical</strong><label>Max Span Length (mm)</label><input id="estMaxSpan" value="${escapeHtml(maxSpan)}"></div><p class="subtitle">Estimation mode: span means the distance between two bearing posts. Tracker span type is selected from total tracker length.</p><div class="table-wrap framed"><table><thead><tr><th>Tracker Type</th><th>Max Tracker Length (mm)</th><th>Bearing Posts</th></tr></thead><tbody>${[2,4,6,8].map(s=>`<tr><td>${s}-Span</td><td>${escapeHtml(E.niceNumber(limits[s]))}</td><td>${s} Bearing posts</td></tr>`).join('')}</tbody></table></div><div id="bearingSummary"></div>`;
+    const maxSpan=iValue('max_span_length',p.inputs.max_span_length);const limits=E.getSpanLimits(p);root.innerHTML=`<div class="bearing-top"><label>Array Type</label><select disabled><option>${escapeHtml(uiState.customRule.pv)}</option></select><label>Mode</label><strong>Symmetrical</strong><label>Max Span Length (mm)</label><input id="estMaxSpan" value="${escapeHtml(maxSpan)}"></div><p class="subtitle">Estimation mode: span means the distance between two bearing piles. Tracker span type is selected from total tracker length.</p><div class="table-wrap framed"><table><thead><tr><th>Tracker Type</th><th>Max Tracker Length (mm)</th><th>Bearing Piles</th></tr></thead><tbody>${[2,4,6,8].map(s=>`<tr><td>${s}-Span</td><td>${escapeHtml(E.niceNumber(limits[s]))}</td><td>${s} Bearing Piles</td></tr>`).join('')}</tbody></table></div><div id="bearingSummary"></div>`;
     document.getElementById('estMaxSpan').addEventListener('input',e=>{p.inputs.max_span_length=e.target.value;markDirty();refreshOutputsOnly();renderBearingSummaryOnly();});renderBearingSummaryOnly();
   }
 }
@@ -667,7 +671,7 @@ function renderBearingSummaryOnly(){
     if(customRuleSelectedKey){[...root.querySelectorAll('tbody tr')].forEach(tr=>{const pv=Number(String(tr.cells[0]?.textContent||'').replace('-PV','')),mode=tr.cells[1]?.textContent;if(bearingConfigurationSelectionKey(pv,mode)===customRuleSelectedKey)tr.classList.add('row-selected');});}
   }else{
     const rows=current.schedule.map(row=>[`${row['PV Modules per Tracker']}-PV`,'Symmetrical',E.niceNumber(E.asNumber(p.inputs.max_span_length,7900)),E.niceNumber(row['Tracker Length (mm)']),row['Span Type'],row['Bearing Posts / Tracker']]);
-    root.innerHTML=makeArrayTable(['Array Type','Mode','Max Span Length (mm)','Tracker Length (mm)','Tracker Type','Bearing Posts'],rows,{rawArrays:true});
+    root.innerHTML=makeArrayTable(['Array Type','Mode','Max Span Length (mm)','Tracker Length (mm)','Tracker Type','Bearing Piles'],rows,{rawArrays:true});
   }
 }
 function nextManualKey(){
@@ -685,7 +689,7 @@ function renderManualParts(){
 function displayValue(value){return value===null||value===undefined?'':String(E.niceNumber(value));}
 function makeArrayTable(columns,rows,options={}){
   const rawArrays=!!options.rawArrays;
-  const html=`<div class="table-wrap ${options.framed?'framed':''}"><table><thead><tr>${columns.map(c=>`<th class="${c==='Reason'?'wrap':''}">${escapeHtml(c)}</th>`).join('')}</tr></thead><tbody>${rows.map((row,ri)=>`<tr data-row-index="${ri}">${columns.map((c,ci)=>{const v=rawArrays?row[ci]:row?.[c];const cls=c==='Reason'?'wrap':(c==='Status'||c==='Bearing Status'?(String(v)==='OK'?'status-ok':'status-warning'):'');return `<td class="${cls}">${escapeHtml(displayValue(v))}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div>`;
+  const html=`<div class="table-wrap ${options.framed?'framed':''}"><table><thead><tr>${columns.map(c=>`<th class="${c==='Reason'?'wrap':''}">${escapeHtml(E.displayTerminology(c))}</th>`).join('')}</tr></thead><tbody>${rows.map((row,ri)=>`<tr data-row-index="${ri}">${columns.map((c,ci)=>{const v=rawArrays?row[ci]:row?.[c];const cls=c==='Reason'?'wrap':(c==='Status'||c==='Bearing Status'?(String(v)==='OK'?'status-ok':'status-warning'):'');return `<td class="${cls}">${escapeHtml(displayValue(E.displayTerminology(v)))}</td>`;}).join('')}</tr>`).join('')}</tbody></table></div>`;
   if(!options.clickRow)return html;
   const holder=document.createElement('div');holder.innerHTML=html;holder.querySelectorAll('tbody tr').forEach(tr=>{const row=rows[Number(tr.dataset.rowIndex)];tr.addEventListener('click',()=>options.clickRow(tr,row));});return holder.innerHTML;
 }
@@ -694,9 +698,9 @@ function analysisTableColumns(columns){
 }
 function makeAnalysisTable(columns,rows){
   const dataColumns=analysisTableColumns(columns),sourceRows=Array.isArray(rows)?rows:[];
-  const headers=dataColumns.map((column,index)=>`<th aria-sort="none"><button class="analysis-sort-button" type="button" data-analysis-sort-index="${index}">${escapeHtml(column)} <span aria-hidden="true">↕</span></button></th>`).join('');
-  const filters=dataColumns.map((column,index)=>index===0?'<th></th>':`<th><input data-analysis-filter-index="${index}" placeholder="Filter" aria-label="Filter ${escapeHtml(column)}"></th>`).join('');
-  const body=sourceRows.map((row,rowIndex)=>`<tr data-analysis-row data-analysis-original-index="${rowIndex}"><td data-analysis-number>${rowIndex+1}</td>${dataColumns.slice(1).map(column=>`<td>${escapeHtml(displayValue(row?.[column]))}</td>`).join('')}</tr>`).join('');
+  const headers=dataColumns.map((column,index)=>`<th aria-sort="none"><button class="analysis-sort-button" type="button" data-analysis-sort-index="${index}">${escapeHtml(E.displayTerminology(column))} <span aria-hidden="true">↕</span></button></th>`).join('');
+  const filters=dataColumns.map((column,index)=>index===0?'<th></th>':`<th><input data-analysis-filter-index="${index}" placeholder="Filter" aria-label="Filter ${escapeHtml(E.displayTerminology(column))}"></th>`).join('');
+  const body=sourceRows.map((row,rowIndex)=>`<tr data-analysis-row data-analysis-original-index="${rowIndex}"><td data-analysis-number>${rowIndex+1}</td>${dataColumns.slice(1).map(column=>`<td>${escapeHtml(displayValue(E.displayTerminology(row?.[column])))}</td>`).join('')}</tr>`).join('');
   return `<div class="table-wrap analysis-table-wrap"><table class="analysis-data-table" data-analysis-table><thead><tr>${headers}</tr><tr class="analysis-table-filter-row">${filters}</tr></thead><tbody>${body}<tr data-analysis-empty-row ${sourceRows.length?'hidden':''}><td class="empty-table-message" colspan="${dataColumns.length}">${sourceRows.length?'No records match the current filters.':'No records available.'}</td></tr></tbody></table></div>`;
 }
 function analysisComparableNumber(value){
@@ -732,7 +736,7 @@ const ANALYSIS_POST_ONLY_COLUMNS=Object.freeze([
   'Overall Length mm',
 ]);
 function analysisDetailBomColumns(page,extraColumns=[]){
-  const columns=analysisProjectBomColumns(extraColumns);if(page!=='substructure')return columns;
+  const columns=analysisProjectBomColumns(extraColumns);if(page!=='substructure'&&page!=='packaging')return columns;
   const postOnlyColumns=new Set(ANALYSIS_POST_ONLY_COLUMNS);return columns.filter(column=>!postOnlyColumns.has(column));
 }
 function analysisProjectBomRow(source,extraValues={}){
@@ -745,7 +749,7 @@ function keepInlineEditorActive(input){
   input.addEventListener('click',event=>event.stopPropagation());input.addEventListener('dblclick',event=>event.stopPropagation());
 }
 function renderArrayTable(){
-  const root=document.getElementById('tabArray');const cols=['PV / Tracker','Number of Trackers','Tracker Type','Span Type','Bearing Rule','Bearing Mode','PV Gaps / Side','Tracker Length (mm)','Main Tube C','Bearing Posts / Tracker','Bearing 120','Bearing 110','Bearing 100','K001099 / Tracker','Status'];
+  const root=document.getElementById('tabArray');const cols=['PV / Tracker','Number of Trackers','Tracker Type','Span Type','Bearing Rule','Bearing Mode','PV Gaps / Side','Tracker Length (mm)','Torque Tube C','Bearing Piles / Tracker','Bearing 120','Bearing 110','Bearing 100','K001099 / Tracker','Status'];
   const rows=current.schedule.map(r=>{
     const cNorth=E.asNumber(r['Main Tube C Required Length North'],0),cSouth=E.asNumber(r['Main Tube C Required Length South'],0);let c='Not required';
     if(cNorth>0||cSouth>0)c=`${displayValue(r['Main Tube C Required Length'])} (${r['Main Tube C Stock Suggestion']})`;
@@ -818,7 +822,7 @@ function buildLogicText(){
   // lines.push('4) MODULE SUPPORT PLATE K001099 CALCULATION','-'.repeat(90),'Rail positions are calculated from mid-plane on one side, then mirrored to the other side.','','First rail position:','Motor Gap / 2 + (PV Module Width - PV Module Transverse Hole Distance) / 2 + Z Rail Offset',`= ${n(d.motor_gap)} / 2 + (${n(d.pv_module_width)} - ${n(d.pv_module_hole_distance)}) / 2 + ${n(d.z_rail_offset)}`,`= ${n(first)} mm`,'','Second rail position increment:','PV Module Transverse Hole Distance + Hat Rail Hole Distance / 2 - Z Rail Offset','','Next rail increment:','PV Module Transverse Hole Distance + Hat Rail Hole Distance','','Support plate rules:','Base condition: each module rail has minimum 1 support plate.','Bearing 110: closest left/right rails get 2 plates.','Bearing 100: closest left/right rails get 4 plates.','Taper rule: 4 → 3 → 2 → 1, or 2 → 1.','Beam height compensation:','A/120 level = 0, B/110 level = 1, C/100 level = 2.','Corrected formula:','Final plates = max(1, taper plates + rail beam level - bearing beam level)','The bearing beam level is used as the reference, not the nearest rail beam level.','',`Module Support Plates / Side = ${n(row['Module Support Plates / Side'])}`,`Module Support Plates / Tracker = ${n(row['Module Support Plates / Tracker'])}`);
   const baseModuleQty=Math.max(E.asInt(row['PV Modules per Tracker'])-2,0),bearing110=E.asInt(row['Bearing 110 / Tracker']),bearing100=E.asInt(row['Bearing 100 / Tracker']);
   lines.push('4) MODULE SUPPORT PLATE K001099 / PLUSS00173BZ00 CALCULATION','-'.repeat(90),'TEMPORARY CALCULATION NOTE:','PV Module Support Plate / Tracker = (PV modules − 2) + (2 × Bearing 110) + (6 × Bearing 100).','',`PV modules − 2 = ${n(baseModuleQty)}`,`2 × Bearing 110 = 2 × ${n(bearing110)} = ${n(2*bearing110)}`,`6 × Bearing 100 = 6 × ${n(bearing100)} = ${n(6*bearing100)}`,`Module Support Plates / Tracker = ${n(baseModuleQty)} + ${n(2*bearing110)} + ${n(6*bearing100)} = ${n(row['Module Support Plates / Tracker'])}`,`Module Support Plates / Side = ${n(row['Module Support Plates / Side'])}`);
-  return lines.join('\n');
+  return E.displayTerminology(lines.join('\n'));
 }
 function renderLogic(){
   ensureLogicSelection();const p=getActiveProject(),opts=logicOptions();const root=document.getElementById('tabLogic');root.innerHTML=`<div class="logic-top"><label>Show logic for PV / Tracker:</label><select id="logicPv">${opts.map(r=>{const v=String(r['PV Modules per Tracker']);return `<option ${v===String(p.selected_logic_pv)?'selected':''}>${v}</option>`;}).join('')}</select></div><div class="logic-box">${escapeHtml(buildLogicText())}</div>`;
@@ -851,7 +855,7 @@ function buildSketchSvg(row,width=1200,height=700){
   const distances=[...new Set((row._bearing_rows||[]).map(b=>Math.abs(E.asNumber(b['Distance from Main Post (mm)']))).filter(v=>v>0))].sort((a,b)=>a-b);distances.forEach((dist,idx)=>{const y=dimY+52+idx*18;if(y>height-26)return;for(const sign of [-1,1]){const ex=x(sign*dist);line(centerX,y,ex,y,'#2563EB',1);line(ex,y-4,ex,y+4,'#2563EB',1);}line(centerX,y-4,centerX,y+4,'#2563EB',1);text(centerX,y-8,`±${n(dist)} mm`,8,'#2563EB','bold');});
   const lx=width-rightMargin+35;let ly=57;rect(lx-12,40,width-20,260,'#FFFFFF','#D1D5DB');text(lx,ly,'Legend',12,'#111827','bold','start');ly=95;
   const legend=(color,label,kind='line',outline='#111827')=>{if(kind==='rect')rect(lx,ly-6,lx+24,ly+6,color,outline);else if(kind==='text')text(lx+12,ly,'#',10,color,'bold');else line(lx,ly,lx+24,ly,color,5);text(lx+34,ly,label,9,'#111827','normal','start');ly+=26;};
-  if(uiState.showPv)legend('#F3F4F6','PV module','rect','#9CA3AF');if(uiState.showRails)legend('#F28C28','Module rail');if(uiState.showSupport)legend('#DC2626','Support plate quantity','text');if(uiState.showBeams){legend('#C7F9CC','Main Tube A / 120','rect','#15803D');legend('#BFDBFE','Main Tube B / 110','rect','#1D4ED8');if(hasC)legend('#FDE68A','Main Tube C / 100','rect','#B45309');}legend('#374151','Post reference');parts.push('</svg>');return parts.join('');
+  if(uiState.showPv)legend('#F3F4F6','PV module','rect','#9CA3AF');if(uiState.showRails)legend('#F28C28','Module rail');if(uiState.showSupport)legend('#DC2626','Support plate quantity','text');if(uiState.showBeams){legend('#C7F9CC','Torque Tube A / 120','rect','#15803D');legend('#BFDBFE','Torque Tube B / 110','rect','#1D4ED8');if(hasC)legend('#FDE68A','Torque Tube C / 100','rect','#B45309');}legend('#374151','Drive Pile reference');parts.push('</svg>');return parts.join('');
 }
 function removeSketchMagnifierLens(clearPointer=true){
   document.getElementById('sketchMagnifierLens')?.remove();if(clearPointer)sketchMagnifierPointer=null;
@@ -877,7 +881,7 @@ function wireSketchMagnifier(){
   setSketchMagnifierEnabled(uiState.sketchMagnifierEnabled);button.addEventListener('click',()=>setSketchMagnifierEnabled(!uiState.sketchMagnifierEnabled));levelSelect.addEventListener('change',()=>{const level=Number(levelSelect.value);uiState.sketchMagnification=SKETCH_MAGNIFICATION_LEVELS.includes(level)?level:2;if(sketchMagnifierPointer)updateSketchMagnifier(sketchMagnifierPointer);});box.addEventListener('pointerenter',updateSketchMagnifier);box.addEventListener('pointermove',updateSketchMagnifier);box.addEventListener('pointerleave',()=>removeSketchMagnifierLens());box.addEventListener('scroll',()=>removeSketchMagnifierLens());
 }
 function renderSketch(){
-  removeSketchMagnifierLens();ensureSketchSelection();const p=getActiveProject(),opts=sketchOptions();const root=document.getElementById('tabSketch');root.innerHTML=`<div class="sketch-top"><label>Sketch for PV / Tracker:</label><select id="sketchPv">${opts.map(r=>{const v=sketchRowKey(r);return `<option value="${escapeHtml(v)}" ${v===String(p.selected_sketch_pv)?'selected':''}>${escapeHtml(sketchRowLabel(r))}</option>`;}).join('')}</select><span class="subtitle" style="margin:0 0 0 12px">This is a simple logic sketch, not a CAD drawing.</span><button id="saveSketch" style="margin-left:auto;background:#F99A1C;color:white;border-color:#C96F00">Save High-Resolution Image</button></div><div class="sketch-options"><strong>Show:</strong>${[['PV Modules','showPv'],['Support plates','showSupport'],['Module Rails','showRails'],['Main Tubes','showBeams']].map(([label,key])=>`<label><input type="checkbox" data-sketch-option="${key}" ${uiState[key]?'checked':''}> ${label}</label>`).join('')}<div class="sketch-magnifier-controls"><button id="sketchMagnifierToggle" class="sketch-magnifier-button" type="button" aria-pressed="${uiState.sketchMagnifierEnabled}" title="Turn the sketch magnifier on or off"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 5 5M10.5 7.5v6m-3-3h6"></path></svg><span>Magnifier</span></button><label for="sketchMagnification">Zoom<select id="sketchMagnification">${SKETCH_MAGNIFICATION_LEVELS.map(level=>`<option value="${level}" ${Number(uiState.sketchMagnification)===level?'selected':''}>${level}×</option>`).join('')}</select></label></div></div><div id="sketchBox" class="sketch-box"></div>`;
+  removeSketchMagnifierLens();ensureSketchSelection();const p=getActiveProject(),opts=sketchOptions();const root=document.getElementById('tabSketch');root.innerHTML=`<div class="sketch-top"><label>Sketch for PV / Tracker:</label><select id="sketchPv">${opts.map(r=>{const v=sketchRowKey(r);return `<option value="${escapeHtml(v)}" ${v===String(p.selected_sketch_pv)?'selected':''}>${escapeHtml(sketchRowLabel(r))}</option>`;}).join('')}</select><span class="subtitle" style="margin:0 0 0 12px">This is a simple logic sketch, not a CAD drawing.</span><button id="saveSketch" style="margin-left:auto;background:#F99A1C;color:white;border-color:#C96F00">Save High-Resolution Image</button></div><div class="sketch-options"><strong>Show:</strong>${[['PV Modules','showPv'],['Support plates','showSupport'],['Module Rails','showRails'],['Torque Tubes','showBeams']].map(([label,key])=>`<label><input type="checkbox" data-sketch-option="${key}" ${uiState[key]?'checked':''}> ${label}</label>`).join('')}<div class="sketch-magnifier-controls"><button id="sketchMagnifierToggle" class="sketch-magnifier-button" type="button" aria-pressed="${uiState.sketchMagnifierEnabled}" title="Turn the sketch magnifier on or off"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"></circle><path d="m15.5 15.5 5 5M10.5 7.5v6m-3-3h6"></path></svg><span>Magnifier</span></button><label for="sketchMagnification">Zoom<select id="sketchMagnification">${SKETCH_MAGNIFICATION_LEVELS.map(level=>`<option value="${level}" ${Number(uiState.sketchMagnification)===level?'selected':''}>${level}×</option>`).join('')}</select></label></div></div><div id="sketchBox" class="sketch-box"></div>`;
   document.getElementById('sketchPv').addEventListener('change',e=>{p.selected_sketch_pv=e.target.value;p.is_dirty=true;saveRecovery();drawSketch();});root.querySelectorAll('[data-sketch-option]').forEach(cb=>cb.addEventListener('change',()=>{uiState[cb.dataset.sketchOption]=cb.checked;drawSketch();}));document.getElementById('saveSketch').addEventListener('click',saveHighResSketch);wireSketchMagnifier();drawSketch();
 }
 function drawSketch(){
@@ -1003,7 +1007,7 @@ function renderSteelAnalysis(){
 }
 
 const ANALYSIS_ITEM_PAGE_CONFIG=Object.freeze({
-  posts:{title:'Posts',subtitle:'Main and bearing post supplier pricing by BOM TAG.'},
+  posts:{title:'Posts',subtitle:'Drive Pile and Bearing Pile supplier pricing by BOM TAG.'},
   substructure:{title:'Substructure',subtitle:'Read-only supplier pricing for structural items other than posts.'},
   bearing:{title:'Bearing',subtitle:'Read-only supplier pricing for bearing components.'},
   slew_drive:{title:'Slew Drive',subtitle:'Read-only supplier pricing for slew-drive components.'},
@@ -1407,20 +1411,20 @@ function analysisFindPackagePart(item){
 function buildFastenerPackagingData(){
   const active=current?.active||[],totalTrackers=active.reduce((sum,row)=>sum+E.asInt(row['Number of Trackers']),0),bearingPackages=active.reduce((sum,row)=>sum+E.asInt(row['Bearing Posts / Tracker'])*E.asInt(row['Number of Trackers']),0),hatRailPackages=active.reduce((sum,row)=>sum+Math.max(E.asInt(row['PV Modules per Tracker'])-2,0)*E.asInt(row['Number of Trackers']),0),zRailPackages=4*totalTrackers;
   const definitions=[
-    {title:'Slew Drive Seat to Main Post',basis:'One package per tracker',packages:totalTrackers,items:[['k001164',8],['k001010',8],['k001154',16],['k001163',8]]},
+    {title:'Slew Drive Seat to Drive Pile',basis:'One package per tracker',packages:totalTrackers,items:[['k001164',8],['k001010',8],['k001154',16],['k001163',8]]},
     {title:'Slew Drive to Slew Drive Seat',basis:'One package per tracker',packages:totalTrackers,items:[['k001231',4],['k001228',4],['k001238',4],['k001230',4],[null,2,'din7967m18','DIN 7967 - M18'],[null,2,'din936iso4035m18','DIN 936 ISO 4035 - M18'],['k001239',4]]},
-    {title:'Bearing Adapter to Bearing Post',basis:'One package per bearing adapter',packages:bearingPackages,items:[['k001125',4],['k001124',4],['k001130',4],['k001123',4]]},
+    {title:'Bearing Adapter to Bearing Pile',basis:'One package per bearing adapter',packages:bearingPackages,items:[['k001125',4],['k001124',4],['k001130',4],['k001123',4]]},
     {title:'Bearing to Bearing Adapter',basis:'One package per bearing',packages:bearingPackages,items:[['k001129',2],['k001137',2]]},
-    {title:'Main Tube to Slew Drive',basis:'One package per tracker',packages:totalTrackers,items:[['k001385',16],['k001127',22],['k001166',16]]},
-    {title:'Main Tube to Main Tube',basis:'One package per tracker',packages:totalTrackers,items:[['k001388',16],['k001157',32],['k001013',16],['k001479',32]]},
-    {title:'Hat Rail to Main Tube',basis:'One package per Hat rail',packages:hatRailPackages,items:[['k001576',2],['k001575',2],['k001074',2]]},
-    {title:'Z Rail to Main Tube',basis:'One package per Z rail',packages:zRailPackages,items:[['k001151',2],['k001235',2],['k001074',2]]},
+    {title:'Torque Tube to Slew Drive',basis:'One package per tracker',packages:totalTrackers,items:[['k001385',16],['k001127',22],['k001166',16]]},
+    {title:'Torque Tube to Torque Tube',basis:'One package per tracker',packages:totalTrackers,items:[['k001388',16],['k001157',32],['k001013',16],['k001479',32]]},
+    {title:'Hat Rail to Torque Tube',basis:'One package per Hat rail',packages:hatRailPackages,items:[['k001576',2],['k001575',2],['k001074',2]]},
+    {title:'Z Rail to Torque Tube',basis:'One package per Z rail',packages:zRailPackages,items:[['k001151',2],['k001235',2],['k001074',2]]},
   ];
   return definitions.map(definition=>{const rows=definition.items.map(([tag,qty,match,label])=>{const part=analysisFindPackagePart({tag,match,label});return analysisProjectBomRow(part.source||{'Part Name':part.name,TAG:part.tag,Description:part.description},{'Qty / Package':qty,'Packages':definition.packages,'Required Qty':qty*definition.packages});});return {...definition,rows};});
 }
 function renderFastenerPackaging(){
   const root=document.getElementById('tabAnalysis'),sections=buildFastenerPackagingData();if(!root)return;const totalPackages=sections.reduce((sum,section)=>sum+section.packages,0);
-  root.innerHTML=`<div class="analysis-subpage-nav">${analysisBackButtonHtml()}</div><div class="analysis-title-row"><div><h2 class="table-title">Fastener Packaging</h2><p class="table-subtitle">Installation kits grouped by connection point. Quantities are derived from the active project configuration.</p></div></div><div class="analysis-summary"><div class="analysis-card"><span>Installation Sections</span><strong>${sections.length}</strong></div><div class="analysis-card"><span>Total Section Packages</span><strong>${formatAnalysisNumber(totalPackages,0)}</strong></div><div class="analysis-card analysis-packaging-note"><span>Contingency Handling</span><strong>Project BOM</strong></div></div><div class="analysis-warning analysis-info">Packaging shows installation-required quantities. Any fastener contingency remains visible in the Project BOM and is not divided into installation packages.</div><div class="analysis-package-grid">${sections.map((section,index)=>`<section class="analysis-package-section"><div class="analysis-package-header"><div><span>Installation Section ${index+1}</span><h3>${escapeHtml(section.title)}</h3><p>${escapeHtml(section.basis)}</p></div><strong>${formatAnalysisNumber(section.packages,0)} package(s)</strong></div>${makeAnalysisTable(analysisProjectBomColumns(['Qty / Package','Packages','Required Qty']),section.rows)}</section>`).join('')}</div>`;
+  root.innerHTML=`<div class="analysis-subpage-nav">${analysisBackButtonHtml()}</div><div class="analysis-title-row"><div><h2 class="table-title">Fastener Packaging</h2><p class="table-subtitle">Installation kits grouped by connection point. Quantities are derived from the active project configuration.</p></div></div><div class="analysis-summary"><div class="analysis-card"><span>Installation Sections</span><strong>${sections.length}</strong></div><div class="analysis-card"><span>Total Section Packages</span><strong>${formatAnalysisNumber(totalPackages,0)}</strong></div><div class="analysis-card analysis-packaging-note"><span>Contingency Handling</span><strong>Project BOM</strong></div></div><div class="analysis-warning analysis-info">Packaging shows installation-required quantities. Any fastener contingency remains visible in the Project BOM and is not divided into installation packages.</div><div class="analysis-package-grid">${sections.map((section,index)=>`<section class="analysis-package-section"><div class="analysis-package-header"><div><span>Installation Section ${index+1}</span><h3>${escapeHtml(section.title)}</h3><p>${escapeHtml(section.basis)}</p></div><strong>${formatAnalysisNumber(section.packages,0)} package(s)</strong></div>${makeAnalysisTable(analysisDetailBomColumns('packaging',['Qty / Package','Packages','Required Qty']),section.rows)}</section>`).join('')}</div>`;
   wireAnalysisBackButton();
 }
 function analysisHomeIcon(page){
@@ -1434,18 +1438,17 @@ function analysisHomeSummary(totals,hasGaps=false){
   const text=analysisCurrencyText(totals,'');return text|| (hasGaps?'Prices required':'0.00');
 }
 function renderAnalysisHome(){
-  const root=document.getElementById('tabAnalysis');if(!root)return;const total=buildTotalCostData(),packages=buildFastenerPackagingData(),logistics=buildLogisticsData(),finalCost=buildFinalCostData(total,logistics),personnel=total.personnel,result=buildResultAnalysisData();
+  const root=document.getElementById('tabAnalysis');if(!root)return;const total=buildTotalCostData(),packages=buildFastenerPackagingData(),logistics=buildLogisticsData(),finalCost=buildFinalCostData(total,logistics),personnel=total.personnel;
   const cards=[
     ...analysisCommercialPages().map(page=>({page,title:ANALYSIS_ITEM_PAGE_CONFIG[page].title,description:ANALYSIS_ITEM_PAGE_CONFIG[page].subtitle,summary:isAnalysisSectionIncluded(page)?supplierCostSummaryText(buildSupplierCostData(page)):'Excluded — client supplied'})),
     {page:'total',title:'Overhead & Final Price',description:'Project overhead, subtotal, final VAT, and final price.',summary:finalCost.finalCostIncludingVat===null?'Configuration required':overheadMoney(finalCost.finalCostIncludingVat)},
     {page:'logistics',title:'Logistics',description:'Container-based external and internal logistics by shipment.',summary:logistics.status==='loading'||logistics.status==='idle'?'Loading logistics':commercialCurrencyText(logistics.grandTotals,logistics.complete?'0.00':'Configuration required')},
     {page:'personnel',title:'Personnel Costs',description:'Read-only monthly, yearly, and per-MW Personnel cost allocation.',summary:personnel.status==='loading'||personnel.status==='idle'?'Loading Personnel costs':personnel.complete?overheadMoney(personnel.projectPersonnelCost):'Configuration required'},
     {page:'packaging',title:'Fastener Packaging',description:'Installation kits for eight connection sections.',summary:`${packages.length} installation sections`},
-    {page:'result',title:'Result',description:'Landed material, Personnel, Overhead, Contingency, Margin, VAT, and final price.',summary:result.complete?resultMoney(result.finalPrice):'Configuration required'},
   ];
   root.innerHTML=`<div class="analysis-home-header"><h2 class="table-title">Project Cost Analysis</h2><p class="table-subtitle">Choose an analysis area for the active project.</p></div><div class="analysis-home-grid">${cards.map(card=>`<button class="analysis-home-card" type="button" data-analysis-page="${card.page}"><span class="analysis-home-icon">${analysisHomeIcon(card.page)}</span><span class="analysis-home-copy"><strong>${escapeHtml(card.title)}</strong><span>${escapeHtml(card.description)}</span><em>${escapeHtml(card.summary)}</em></span><span class="analysis-home-arrow" aria-hidden="true">›</span></button>`).join('')}</div>`;
   const grid=root.querySelector('.analysis-home-grid'),buttons=new Map([...grid.children].map(button=>[button.dataset.analysisPage,button]));grid.classList.add('analysis-home-sections');grid.replaceChildren();
-  for(const [title,pages] of [['Steel Structure',['posts','substructure']],['Major Components',['slew_drive','bearing','pv_module']],['Electrical',['soltrk','junction_box','cable_gland','safeguard','anemometer','power_supply','electrical_enclosure','limit_switch']],['Fasteners',['fasteners']],['Logistics',['logistics']],['Personnel',['personnel']],['Summary',['total','packaging']],['Result',['result']]]){
+  for(const [title,pages] of [['Steel Structure',['posts','substructure']],['Major Components',['slew_drive','bearing','pv_module']],['Electrical',['soltrk','junction_box','cable_gland','safeguard','anemometer','power_supply','electrical_enclosure','limit_switch']],['Fasteners',['fasteners']],['Logistics',['logistics']],['Personnel',['personnel']],['Summary',['total']],['Packaging',['packaging']]]){
     const section=document.createElement('section');section.className=`analysis-home-section ${pages.length>3?'analysis-home-section-wide':''}`;section.innerHTML=`<h3>${escapeHtml(title)}</h3><div class="analysis-home-grid"></div>`;const sectionGrid=section.querySelector('.analysis-home-grid');pages.forEach(page=>{if(buttons.has(page))sectionGrid.appendChild(buttons.get(page));});grid.appendChild(section);
   }
   root.querySelectorAll('[data-analysis-page]').forEach(button=>button.addEventListener('click',()=>{uiState.analysisPage=button.dataset.analysisPage;renderAnalysis();requestAnimationFrame(updateFixedHorizontalScroll);}));
@@ -1453,7 +1456,7 @@ function renderAnalysisHome(){
 function renderAnalysis(){
   const page=String(uiState.analysisPage||'home'),root=document.getElementById('tabAnalysis');
   ensureCommercialAnalysisData();ensureLogisticsData();ensureOverheadSettings();ensurePersonnelSettings();
-  if(analysisCommercialPages().includes(page))renderSupplierCostAnalysis(page);else if(page==='total')renderTotalCostAnalysis();else if(page==='packaging')renderFastenerPackaging();else if(page==='logistics')renderLogisticsAnalysis();else if(page==='personnel')renderPersonnelAnalysis();else if(page==='result')renderResultAnalysis();else{uiState.analysisPage='home';renderAnalysisHome();}
+  if(analysisCommercialPages().includes(page))renderSupplierCostAnalysis(page);else if(page==='total')renderTotalCostAnalysis();else if(page==='packaging')renderFastenerPackaging();else if(page==='logistics')renderLogisticsAnalysis();else if(page==='personnel')renderPersonnelAnalysis();else{uiState.analysisPage='home';renderAnalysisHome();}
   wireAnalysisTables(root);root?.querySelectorAll('[data-analysis-table]').forEach(refreshAnalysisTable);
 }
 
@@ -1465,13 +1468,23 @@ function customBearingExportRows(p,calc){
   if(E.cadBlocksAreAvailable(p)){
     const rows=[['Array Type','Mode','Number of Trackers','Posts / Pairs','North / Pair Distances','South Distances']];for(const pv of Object.keys(p.bearing_rules).sort((a,b)=>Number(a)-Number(b)))for(const rule of E.getBearingRuleVariantsForPv(p,pv))rows.push(ruleToTableValues(Number(pv),rule));return rows;
   }
-  const rows=[['Array Type','Mode','Max Span Length (mm)','Tracker Length (mm)','Tracker Type','Bearing Posts']];for(const r of calc.schedule)rows.push([`${r['PV Modules per Tracker']}-PV`,'Symmetrical',E.niceNumber(E.asNumber(p.inputs.max_span_length,7900)),E.niceNumber(r['Tracker Length (mm)']),r['Span Type'],r['Bearing Posts / Tracker']]);return rows;
+  const rows=[['Array Type','Mode','Max Span Length (mm)','Tracker Length (mm)','Tracker Type','Bearing Piles']];for(const r of calc.schedule)rows.push([`${r['PV Modules per Tracker']}-PV`,'Symmetrical',E.niceNumber(E.asNumber(p.inputs.max_span_length,7900)),E.niceNumber(r['Tracker Length (mm)']),r['Span Type'],r['Bearing Posts / Tracker']]);return rows;
 }
 function buildProjectExport(p){
   if(partMasterLoading)throw new Error('Part Master is still loading. Wait for it to finish before exporting.');
   if(partMasterLoadError)throw new Error(`Export blocked: ${partMasterLoadError}`);
   const validation=E.calculateProject(p,partMaster,partMasterColumns);if((validation.engineeringErrors||[]).length)throw new Error(`Export blocked: ${validation.engineeringErrors.join(' ')}`);
-  const calc=E.calculateProject(p,partMaster,partMasterColumns);const arrays=[SELECTED_ARRAY_COLUMNS,...calc.active.map(r=>SELECTED_ARRAY_COLUMNS.map(c=>r[c]??''))];const bomColumns=calc.bom.columns.filter(c=>!['note','notes','calculationnote'].includes(E.normalizeText(c)));const bom=[bomColumns,...calc.bom.rows.map(r=>bomColumns.map(c=>r[c]??''))];const sheets=[{name:'Project Summary',rows:projectSummaryRows(p,calc)},{name:'Inputs',rows:inputExportRows(p)},{name:'Custom Bearing Rules',rows:customBearingExportRows(p,calc)},{name:'Selected Arrays',rows:arrays},{name:'Project BOM',rows:bom}];return {blob:XlsxLite.createWorkbookBlob(sheets),filename:`${safeFilename(p.project_code)}_${safeFilename(p.project_name)}_LUMA_Complete_BOM.xlsx`};
+  const calc=E.calculateProject(p,partMaster,partMasterColumns);
+  const displayExportCell=value=>E.displayTerminology(value);
+  const arrayColumns=SELECTED_ARRAY_COLUMNS.map(displayExportCell);
+  const arrays=[arrayColumns,...calc.active.map(row=>SELECTED_ARRAY_COLUMNS.map(column=>displayExportCell(row[column]??'')))];
+  const bomColumns=calc.bom.columns.filter(column=>!['note','notes','calculationnote'].includes(E.normalizeText(column)));
+  const bom=[bomColumns.map(displayExportCell),...calc.bom.rows.map(row=>bomColumns.map(column=>displayExportCell(row[column]??'')))];
+  const foundationRows=[['Foundation Method',p.inputs.foundation_method],['Drive Pile Depth (mm)',p.inputs.drive_pile_depth_mm],['Drive Pile Type',p.inputs.main_post_profile],['Bearing Pile Depth (mm)',p.inputs.bearing_pile_depth_mm],['Bearing Pile Type',p.inputs.bearing_post_profile]];
+  const summaryRows=[...projectSummaryRows(p,calc),...foundationRows];
+  const inputRows=[...inputExportRows(p),...foundationRows].map(row=>row.map(displayExportCell));
+  const sheets=[{name:'Project Summary',rows:summaryRows},{name:'Inputs',rows:inputRows},{name:'Custom Bearing Rules',rows:customBearingExportRows(p,calc)},{name:'Selected Arrays',rows:arrays},{name:'Project BOM',rows:bom}];
+  return {blob:XlsxLite.createWorkbookBlob(sheets),filename:`${safeFilename(p.project_code)}_${safeFilename(p.project_name)}_LUMA_Complete_BOM.xlsx`};
 }
 async function exportProject(p,directoryHandle=null){
   const file=buildProjectExport(p);if(directoryHandle){await saveBlobToDirectory(file.blob,file.filename,directoryHandle);return {saved:true,picker:true};}

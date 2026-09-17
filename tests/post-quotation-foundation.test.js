@@ -12,17 +12,20 @@ test('post configuration resolves only exact authoritative combinations',()=>{
   const service=context.globalThis.LumaPostConfiguration,parts=[
     {TAG:'k001152',Active:true,'Post Kind':'Main Post','Foundation Method':'Ramming','Foundation Depth mm':2000,'Profile Type':'HEA 140'},
     {TAG:'k001120',Active:true,'Post Kind':'Bearing Post','Foundation Method':'Ramming','Foundation Depth mm':2000,'Profile Type':'C'},
-    {TAG:'future',Active:true,'Post Kind':'Main Post','Foundation Method':'Ramming','Foundation Depth mm':2600,'Profile Type':'HEA 140'},
+    {TAG:'future',Active:true,'Post Kind':'Drive Pile','Foundation Method':'Ramming','Foundation Depth mm':2600,'Profile Type':'HEA 140'},
+    {TAG:'bearing-2300',Active:true,'Post Kind':'Bearing Pile','Foundation Method':'Ramming','Foundation Depth mm':2300,'Profile Type':'C'},
   ];
-  assert.deepEqual(Array.from(service.depthOptions(parts)),['2000','2600']);
+  assert.deepEqual(Array.from(service.depthOptions(parts,'Drive Pile')),['2000','2600']);
+  assert.deepEqual(Array.from(service.depthOptions(parts,'Bearing Pile')),['2000','2300']);
   assert.deepEqual(Array.from(service.profileOptions(parts,'Main Post')),['HEA 140']);
-  const project={inputs:{foundation_method:'Ramming',foundation_depth_mm:'2000',main_post_profile:'HEA 140',bearing_post_profile:'C'}};
+  const project={inputs:{foundation_method:'Ramming',drive_pile_depth_mm:'2000',bearing_pile_depth_mm:'2300',main_post_profile:'HEA 140',bearing_post_profile:'C'}};
   assert.equal(service.resolve(parts,service.selection(project,'Main Post')).TAG,'k001152');
   assert.equal(service.validate(project,parts).valid,true);
+  assert.equal(service.validate(project,parts).matches.bearing.TAG,'bearing-2300');
   project.inputs.main_post_profile='HEA 160';
   const result=service.validate(project,parts);
   assert.equal(result.valid,false);
-  assert.match(result.errors[0],/No Main Post is configured/);
+  assert.match(result.errors[0],/No Drive Pile is configured/);
   parts.push({...parts[0],TAG:'duplicate'});
   project.inputs.main_post_profile='HEA 140';
   assert.match(service.validate(project,parts).errors[0],/More than one active Part Master record/);
@@ -49,8 +52,8 @@ test('quotation model reads project, BOM, engineering, commercial, and customer 
   vm.runInContext(read('currency-data.js'),context);
   vm.runInContext(read('quotation-field-definitions.js'),context);
   vm.runInContext(read('quotation-model.js'),context);
-  const project={project_id:'p1',project_code:'P-1',project_name:'Project',inputs:{foundation_method:'Ramming',foundation_depth_mm:'2000',pv_module_width:'1134',pv_module_length:'2384',pv_power:'700'},quotation:{quotation_number:'Q-1',customer_company:'Client'}};
-  const calculation={kpis:{totalPower:2,totalTrackers:10,totalModules:500},active:[{'PV Modules per Tracker':50,'Tracker Length (mm)':63000}],bom:{rows:[{TAG:'k001405','Part Name':'Safeguard','Total Qty':2},{TAG:'post','Part Name':'Main Post','Total Qty':10}]}};
+  const project={project_id:'p1',project_code:'P-1',project_name:'Project',inputs:{foundation_method:'Ramming',drive_pile_depth_mm:'2000',bearing_pile_depth_mm:'2300',pv_module_width:'1134',pv_module_length:'2384',pv_power:'700'},quotation:{quotation_number:'Q-1',customer_company:'Client'}};
+  const calculation={kpis:{totalPower:2,totalTrackers:10,totalModules:500},active:[{'PV Modules per Tracker':50,'Tracker Length (mm)':63000}],bom:{rows:[{TAG:'k001405','Part Name':'Safeguard','Total Qty':2},{TAG:'post','Part Name':'Drive Pile','Total Qty':10}]}};
   const model=window.LumaQuotationModel.fromApplication(project,calculation,{grandTotals:{EUR:12345},gapCount:0});
   assert.equal(model.projectMWp,2);
   assert.equal(model.trackerCount,10);
@@ -160,7 +163,7 @@ test('quotation reads the complete parameterized LaTeX template and safely conne
   const usedCommands=new Set(master.match(/\\QF[A-Za-z]+/g)||[]),defaultCommands=new Set((defaults.match(/\\newcommand\{(\\QF[A-Za-z]+)\}/g)||[]).map(line=>line.match(/\\newcommand\{(\\QF[A-Za-z]+)\}/)[1]));
   assert.deepEqual([...usedCommands].filter(command=>!defaultCommands.has(command)),[]);
   assert.doesNotMatch(html,/docx-preview|pizzip|jszip/i);
-  assert.match(html,/quotation-model\.js\?v=20260908-location-limit/);
+  assert.match(html,/quotation-model\.js\?v=20260917-pile-terminology/);
   assert.match(html,/quotation-field-definitions\.js\?v=20260908-location-limit/);
   assert.match(html,/quotation-latex\.js\?v=20260908-location-limit/);
   assert.match(html,/quotation\/compilers\/quotation-compiler\.js/);
@@ -217,7 +220,7 @@ test('PV capacity and foundation controls are grouped in their requested input s
   const projectStart=app.indexOf('<h2 class="section-title">Project Inputs</h2>');
   const pvStart=app.indexOf('<h2 class="section-title">PV Module Inputs</h2>');
   const foundationStart=app.indexOf('<h2 class="section-title">Foundation Input</h2>');
-  const beamStart=app.indexOf('<h2 class="section-title">Main Tube Inputs</h2>');
+  const beamStart=app.indexOf('<h2 class="section-title">Torque Tube Inputs</h2>');
   assert.ok(projectStart>=0&&projectStart<pvStart&&pvStart<foundationStart&&foundationStart<beamStart);
   const projectSection=app.slice(projectStart,pvStart);
   const pvSection=app.slice(pvStart,foundationStart);
@@ -226,9 +229,10 @@ test('PV capacity and foundation controls are grouped in their requested input s
   assert.match(pvSection,/inputRow\('PV Module Capacity \(Wp\)','pv_power'/);
   assert.ok(pvSection.indexOf("'pv_power'")<pvSection.indexOf("'pv_module_width'"));
   assert.match(foundationSection,/selectRow\('Method','foundation_method'/);
-  assert.match(foundationSection,/selectRow\('Depth','foundation_depth_mm'/);
-  assert.match(foundationSection,/selectRow\('Main Post Type','main_post_profile'/);
-  assert.match(foundationSection,/selectRow\('Bearing Post Type','bearing_post_profile'/);
+  assert.match(foundationSection,/selectRow\('Drive Pile Depth \(mm\)','drive_pile_depth_mm'/);
+  assert.match(foundationSection,/selectRow\('Drive Pile Type','main_post_profile'/);
+  assert.match(foundationSection,/selectRow\('Bearing Pile Depth \(mm\)','bearing_pile_depth_mm'/);
+  assert.match(foundationSection,/selectRow\('Bearing Pile Type','bearing_post_profile'/);
 });
 
 test('Project Inputs store and export free-text document references after Plant Elevation',()=>{

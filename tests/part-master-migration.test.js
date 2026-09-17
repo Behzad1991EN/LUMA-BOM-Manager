@@ -56,7 +56,7 @@ test('terminology migration updates Main Tube labels, connection categories, and
     assert.match(migration, new RegExp(partNumber));
   }
   assert.match(migration, /13 × 43/);
-  assert.match(partService, /replace\(\/Main\\s\+Beam\/gi, 'Main Tube'\)/);
+  assert.match(partService, /replace\(\/Main\\s\+\(\?:Beam\|Tube\)\/gi, 'Torque Tube'\)/);
   assert.match(partService, /replace\(\/13\\s\*\[x×\]\\s\*43\/gi, '13 × 43'\)/);
   assert.doesNotMatch(app, /Main Beam/i);
 });
@@ -92,6 +92,19 @@ test('material and weight migration updates all 20 supplied Part Master TAGs', (
   }
 });
 
+test('pile and torque-tube names and Limit Switch default are reproducible in a new migration', () => {
+  const migration = read('supabase/migrations/20260917002100_pile_torque_tube_terminology.sql');
+  const app = read('app.js');
+  assert.match(migration, /update public\.part_master/);
+  assert.match(migration, /'Drive Pile'/);
+  assert.match(migration, /'Bearing Pile'/);
+  assert.match(migration, /'Torque Tube'/);
+  assert.match(migration, /ELPZFR55100000/);
+  assert.match(migration, /where lower\(btrim\(tag\)\) = 'k001393'/);
+  assert.match(app, /rawInputs\.drive_pile_depth_mm\?\?rawInputs\.foundation_depth_mm/);
+  assert.match(app, /rawInputs\.bearing_pile_depth_mm\?\?rawInputs\.foundation_depth_mm/);
+});
+
 test('calculation-note migration stores the supplied Part Master formulas by stable identity', () => {
   const migration = read('supabase/migrations/20260829000900_add_part_master_calculation_notes.sql');
   const taggedNotes = [...migration.matchAll(/\('(k\d{6})', '([^']*)'\)/g)];
@@ -112,6 +125,7 @@ test('Part Master service caches one database load and resolves exact active pos
     {id:'2',part:'Bearing Post',tag:'k001120',description:'Bearing',category:'Steel Structure',active:true,post_kind:'Bearing Post',foundation_method:'Ramming',foundation_depth_mm:2000,profile_type:'C'},
     {id:'3',part:'Old',tag:'old',description:'Old',category:'Steel Structure',active:false},
     {id:'4',part:'Tube Spacer',tag:'k001479',description:'Spacer',category:'Fastener / Main Beam',active:true},
+    {id:'5',part:'Limit Switch',tag:'k001393',part_number:'EAPZFR55100000',description:'Limit switch',category:'Electrical',active:true},
   ];
   let requests = 0;
   const query = {select(){requests += 1; return this;}, order(){return this;}, then(resolve){resolve({data:rows,error:null});}};
@@ -120,11 +134,12 @@ test('Part Master service caches one database load and resolves exact active pos
   await window.LumaPartMasterService.loadPartMaster();
   await window.LumaPartMasterService.loadPartMaster();
   assert.equal(requests, 1);
-  assert.equal(window.LumaPartMasterService.getAllParts().length, 4);
-  assert.equal(window.LumaPartMasterService.getActiveParts().length, 3);
-  assert.equal(window.LumaPartMasterService.getPartByTag('K001152').Part, 'Main Post');
+  assert.equal(window.LumaPartMasterService.getAllParts().length, 5);
+  assert.equal(window.LumaPartMasterService.getActiveParts().length, 4);
+  assert.equal(window.LumaPartMasterService.getPartByTag('K001152').Part, 'Drive Pile');
   assert.equal(window.LumaPartMasterService.getPartByTag('K001479').Category, 'Steel Structure / Substructure');
-  const match = window.LumaPartMasterService.findPostConfiguration({postKind:'Main Post',foundationMethod:'Ramming',foundationDepthMm:2000,profileType:'HEA 140'});
+  assert.equal(window.LumaPartMasterService.getPartByTag('K001393')['Part Number'], 'ELPZFR55100000');
+  const match = window.LumaPartMasterService.findPostConfiguration({postKind:'Drive Pile',foundationMethod:'Ramming',foundationDepthMm:2000,profileType:'HEA 140'});
   assert.equal(match.status, 'found');
   assert.equal(match.part.TAG, 'k001152');
 });
@@ -143,10 +158,13 @@ test('existing BOM quantities are preserved while known post TAGs resolve from d
   assert.deepEqual(Array.from(calculation.engineeringErrors), []);
   assert.equal(calculation.bom.rows.find(row => row.TAG === 'k001152')['Total Qty'], 1);
   assert.equal(calculation.bom.rows.find(row => row.TAG === 'k001120')['Total Qty'], 2);
-  project.inputs.foundation_depth_mm = '2300';
+  project.inputs.drive_pile_depth_mm = '2300';
   const deeper = engine.calculateProject(project, parts, context.globalThis.INTERNAL_PART_MASTER_COLUMNS);
   assert.equal(deeper.bom.rows.find(row => row.TAG === 'k050376')['Total Qty'], 1);
-  assert.equal(deeper.bom.rows.find(row => row.TAG === 'k060356')['Total Qty'], 2);
+  assert.equal(deeper.bom.rows.find(row => row.TAG === 'k001120')['Total Qty'], 2);
+  project.inputs.bearing_pile_depth_mm = '2300';
+  const bothDeeper = engine.calculateProject(project, parts, context.globalThis.INTERNAL_PART_MASTER_COLUMNS);
+  assert.equal(bothDeeper.bom.rows.find(row => row.TAG === 'k060356')['Total Qty'], 2);
 });
 
 test('Part Master editor exists only inside Administration and supports deactivate/reactivate', () => {
@@ -183,6 +201,6 @@ test('Part Master add and edit form uses organized responsive field sections', (
   assert.match(styles, /\.pm-form-grid-three/);
   assert.match(styles, /\.pm-post-fields\[hidden\]/);
   assert.match(styles, /@media \(max-width: 700px\)/);
-  assert.match(html, /style\.css\?v=20260909-project-document-refs/);
-  assert.match(html, /admin-part-master\.js\?v=20260902-part-master-form/);
+  assert.match(html, /style\.css\?v=20260917-pile-terminology/);
+  assert.match(html, /admin-part-master\.js\?v=20260917-pile-terminology/);
 });

@@ -25,6 +25,14 @@
   function normalizeText(value){
     return String(value ?? '').trim().toLowerCase().replaceAll('×','x').replace(/[^a-z0-9]+/g,'');
   }
+  function displayTerminology(value){
+    if(typeof value!=='string')return value;
+    return value.replace(/\bMain\s+Posts\b/gi,'Drive Piles')
+      .replace(/\bMain\s+Post\b/gi,'Drive Pile')
+      .replace(/\bBearing\s+Posts\b/gi,'Bearing Piles')
+      .replace(/\bBearing\s+Post\b/gi,'Bearing Pile')
+      .replace(/\bMain\s+(?:Beam|Tube)/gi,'Torque Tube');
+  }
   function asNumber(value, def=0){
     if(value === null || value === undefined || value === '') return def;
     const n = Number(value);
@@ -100,7 +108,8 @@
     pv_power:'700',
     foundation_type:'Ramming',
     foundation_method:'Ramming',
-    foundation_depth_mm:'2000',
+    drive_pile_depth_mm:'2000',
+    bearing_pile_depth_mm:'2000',
     main_post_profile:'HEA 140',
     bearing_post_profile:'C',
     project_country_type:'Italy',
@@ -249,7 +258,7 @@
     const southGaps = Math.max(southModules-1,0);
     const trackerType = pvCount > 40 ? 'Long' : 'Short';
     const firstPieceLength = trackerType === 'Long' ? d.main_beam_a_length : d.main_beam_connection_length;
-    const firstPieceName = trackerType === 'Long' ? 'Main Tube A' : 'Slew Drive Connection';
+    const firstPieceName = trackerType === 'Long' ? 'Torque Tube A' : 'Slew Drive Connection';
     const zoneAEnd = d.mid_plane_to_beam_a + firstPieceLength;
     const zoneBEnd = zoneAEnd - d.overlap_ab + d.main_beam_b_length;
     const baseUntilC = zoneBEnd - d.overlap_bc;
@@ -365,9 +374,9 @@
     const zoneAEnd=asNumber(geometry['Zone A End (120)'],0);
     const zoneBEnd=asNumber(geometry['Zone B End (110)'],0);
     const zoneCEnd=positionMm<0?asNumber(geometry['Main Tube C End South from Midplane'] ?? geometry['Main Tube C End from Midplane'],0):asNumber(geometry['Main Tube C End North from Midplane'] ?? geometry['Main Tube C End from Midplane'],0);
-    if(distance<=zoneAEnd) return ['Main Tube A / Connection','Bearing 120','OK'];
-    if(distance<=zoneBEnd) return ['Main Tube B 110','Bearing 110','OK'];
-    if(distance<=zoneCEnd) return ['Main Tube C 100','Bearing 100','OK'];
+    if(distance<=zoneAEnd) return ['Torque Tube A / Connection','Bearing 120','OK'];
+    if(distance<=zoneBEnd) return ['Torque Tube B 110','Bearing 110','OK'];
+    if(distance<=zoneCEnd) return ['Torque Tube C 100','Bearing 100','OK'];
     return ['Outside Tracker','Check input','Warning'];
   }
   function classifyBeamZoneForPosition(geometry,positionMm){
@@ -615,11 +624,11 @@
     if(fastItem && !fastRecord) return false;
     if(!fastItem && fastRecord) return false;
     if(normalizedItem==='pvmodule') return normalizedRecord.includes('pvmodule')||normalizedRecord.includes('solarmodule');
-    if(normalizedItem==='bearingpost') return !normalizedRecord.includes('adapter')&&!normalizedRecord.includes('head')&&(normalizedRecord.includes('bearingpost')||normalizedRecord.includes('lateralpile'));
-    if(normalizedItem==='maintubea') return !normalizedRecord.includes('connection')&&(normalizedRecord.includes('maintubea')||normalizedRecord.includes('mainbeama')||normalizedRecord.includes('120x120'));
-    if(normalizedItem==='maintubeclong'||normalizedItem==='maintubecshort'){
-      if(!normalizedRecord.includes('maintubec')&&!normalizedRecord.includes('mainbeamc')&&!normalizedRecord.includes('100x100')) return false;
-      return normalizedItem==='maintubeclong'?(normalizedRecord.includes('long')||normalizedRecord.includes('11800')):(normalizedRecord.includes('short')||normalizedRecord.includes('8700'));
+    if(normalizedItem==='bearingpile'||normalizedItem==='bearingpost') return !normalizedRecord.includes('adapter')&&!normalizedRecord.includes('head')&&(normalizedRecord.includes('bearingpile')||normalizedRecord.includes('bearingpost')||normalizedRecord.includes('lateralpile'));
+    if(normalizedItem==='torquetubea'||normalizedItem==='maintubea') return !normalizedRecord.includes('connection')&&(normalizedRecord.includes('torquetubea')||normalizedRecord.includes('maintubea')||normalizedRecord.includes('mainbeama')||normalizedRecord.includes('120x120'));
+    if(['torquetubeclong','torquetubecshort','maintubeclong','maintubecshort'].includes(normalizedItem)){
+      if(!normalizedRecord.includes('torquetubec')&&!normalizedRecord.includes('maintubec')&&!normalizedRecord.includes('mainbeamc')&&!normalizedRecord.includes('100x100')) return false;
+      return normalizedItem.endsWith('long')?(normalizedRecord.includes('long')||normalizedRecord.includes('11800')):(normalizedRecord.includes('short')||normalizedRecord.includes('8700'));
     }
     if(normalizedItem==='slewdrive') return !normalizedRecord.includes('seat')&&!normalizedRecord.includes('connection')&&(normalizedRecord.includes('slewingdrive')||normalizedRecord.includes('slewdrive'));
     if(normalizedItem==='limitswitch') return !normalizedRecord.includes('holder')&&!normalizedRecord.includes('trigger')&&!normalizedRecord.includes('frame')&&normalizedRecord.includes('limitswitch');
@@ -676,6 +685,8 @@
     mainpost:Object.freeze({Material:'1.0045 (S355JR)',Weight:84.16}),
     slewdriveseat:Object.freeze({Material:'1.0045 (S355JR)',Weight:9.62}),
     bearingpost:Object.freeze({Material:'1.8902 (S420JR)',Weight:25.26}),
+    drivepile:Object.freeze({Material:'1.0045 (S355JR)',Weight:84.16}),
+    bearingpile:Object.freeze({Material:'1.8902 (S420JR)',Weight:25.26}),
     bearingadapter:Object.freeze({Material:'1.0045 (S355JR)',Weight:5.39}),
     mainbeama:Object.freeze({Material:'1.8902 (S420GD)',Weight:138.63}),
     mainbeamb:Object.freeze({Material:'1.8902 (S420GD)',Weight:130.85}),
@@ -685,6 +696,10 @@
     maintubeb:Object.freeze({Material:'1.8902 (S420GD)',Weight:130.85}),
     maintubeclong:Object.freeze({Material:'1.8902 (S420GD)',Weight:122.4}),
     maintubecshort:Object.freeze({Material:'1.8902 (S420GD)',Weight:89.51}),
+    torquetubea:Object.freeze({Material:'1.8902 (S420GD)',Weight:138.63}),
+    torquetubeb:Object.freeze({Material:'1.8902 (S420GD)',Weight:130.85}),
+    torquetubeclong:Object.freeze({Material:'1.8902 (S420GD)',Weight:122.4}),
+    torquetubecshort:Object.freeze({Material:'1.8902 (S420GD)',Weight:89.51}),
     slewdriveconnection:Object.freeze({Material:'1.0529 (S350GD)',Weight:7.1}),
     hatrail:Object.freeze({Material:'1.8902 (S420GD)',Weight:2.19}),
     zrail:Object.freeze({Material:'1.8902 (S420GD)',Weight:1.84}),
@@ -763,14 +778,14 @@
 
   // V3.40 automatic BOM definitions, kept in the same order as bom_definitions.py.
   const BOM_DEFINITIONS = [
-    ['Main Post',r=>asInt(r['Number of Trackers']),['main post','drive pile','hea 140'],'Structure / Posts','Total Trackers QTY'],
-    ['Slew Drive Seat',r=>2*asInt(r['Number of Trackers']),['slew drive seat','slew seat'],'Drive / Slew','2 × Main Post'],
-    ['Bearing Post',r=>asInt(r['Bearing Posts / Tracker'])*asInt(r['Number of Trackers']),['bearing post','lateral pile','c 160'],'Structure / Posts','Calculated from bearing distance rules'],
-    ['Bearing Adapter',r=>asInt(r['Bearing Posts / Tracker'])*asInt(r['Number of Trackers']),['bearing adapter','adapter bearing','lateral pile head'],'Drive / Bearing','Bearing Post'],
-    ['Main Tube A',r=>r['Tracker Type']==='Long'?2*asInt(r['Number of Trackers']):0,['main tube a','main beam a','120x120'],'Main Tubes','Long trackers only; 2 per tracker'],
-    ['Main Tube B',r=>2*asInt(r['Number of Trackers']),['main tube b','main beam b','110x110'],'Main Tubes','2 per tracker'],
-    ['Main Tube C - Long',r=>((asNumber(r['Main Tube C Required Length North'])>0&&String(r['Main Tube C Stock Suggestion North']).includes('11800')?1:0)+(asNumber(r['Main Tube C Required Length South'])>0&&String(r['Main Tube C Stock Suggestion South']).includes('11800')?1:0))*asInt(r['Number of Trackers']),['main tube c','main beam c','100x100','11800','long'],'Main Tubes','Counted only when required length > 0; per tracker side; odd trackers may have different north/south C length'],
-    ['Main Tube C - Short',r=>((asNumber(r['Main Tube C Required Length North'])>0&&String(r['Main Tube C Stock Suggestion North']).includes('8700')?1:0)+(asNumber(r['Main Tube C Required Length South'])>0&&String(r['Main Tube C Stock Suggestion South']).includes('8700')?1:0))*asInt(r['Number of Trackers']),['main tube c','main beam c','100x100','8700','short'],'Main Tubes','Counted only when required length > 0; per tracker side; odd trackers may have different north/south C length'],
+    ['Drive Pile',r=>asInt(r['Number of Trackers']),['drive pile','main post','hea 140'],'Structure / Posts','Total Trackers QTY'],
+    ['Slew Drive Seat',r=>2*asInt(r['Number of Trackers']),['slew drive seat','slew seat'],'Drive / Slew','2 × Drive Pile'],
+    ['Bearing Pile',r=>asInt(r['Bearing Posts / Tracker'])*asInt(r['Number of Trackers']),['bearing pile','bearing post','lateral pile','c 160'],'Structure / Posts','Calculated from bearing distance rules'],
+    ['Bearing Adapter',r=>asInt(r['Bearing Posts / Tracker'])*asInt(r['Number of Trackers']),['bearing adapter','adapter bearing','lateral pile head'],'Drive / Bearing','Bearing Pile'],
+    ['Torque Tube A',r=>r['Tracker Type']==='Long'?2*asInt(r['Number of Trackers']):0,['torque tube a','main tube a','main beam a','120x120'],'Torque Tubes','Long trackers only; 2 per tracker'],
+    ['Torque Tube B',r=>2*asInt(r['Number of Trackers']),['torque tube b','main tube b','main beam b','110x110'],'Torque Tubes','2 per tracker'],
+    ['Torque Tube C - Long',r=>((asNumber(r['Main Tube C Required Length North'])>0&&String(r['Main Tube C Stock Suggestion North']).includes('11800')?1:0)+(asNumber(r['Main Tube C Required Length South'])>0&&String(r['Main Tube C Stock Suggestion South']).includes('11800')?1:0))*asInt(r['Number of Trackers']),['torque tube c','main tube c','main beam c','100x100','11800','long'],'Torque Tubes','Counted only when required length > 0; per tracker side; odd trackers may have different north/south C length'],
+    ['Torque Tube C - Short',r=>((asNumber(r['Main Tube C Required Length North'])>0&&String(r['Main Tube C Stock Suggestion North']).includes('8700')?1:0)+(asNumber(r['Main Tube C Required Length South'])>0&&String(r['Main Tube C Stock Suggestion South']).includes('8700')?1:0))*asInt(r['Number of Trackers']),['torque tube c','main tube c','main beam c','100x100','8700','short'],'Torque Tubes','Counted only when required length > 0; per tracker side; odd trackers may have different north/south C length'],
     ['Slew Drive Connection',r=>r['Tracker Type']!=='Long'?2*asInt(r['Number of Trackers']):0,['slew drive connection','tube connection','beam connection'],'Main Tubes','Short trackers only; 2 per tracker'],
     ['Hat rail',r=>Math.max(asInt(r['PV Modules per Tracker'])-2,0)*asInt(r['Number of Trackers']),['hat rail','hatrail','pv rail 790x75'],'Module Rails / Support','PV Modules - 2 per tracker'],
     ['Z rail',r=>4*asInt(r['Number of Trackers']),['z rail','zrail','end pv rail'],'Module Rails / Support','4 per tracker'],
@@ -872,7 +887,7 @@
         quantitiesByPv[pv]=asNumber(quantitiesByPv[pv],0)+asNumber(formula(scheduleRow,bomContext),0);
       });
       const resolvedKeywords=typeof keywords==='function'?keywords(bomContext):keywords;
-      const postKind=calculatedItem==='Main Post'?'Main Post':(calculatedItem==='Bearing Post'?'Bearing Post':'');
+      const postKind=calculatedItem==='Drive Pile'?'Drive Pile':(calculatedItem==='Bearing Pile'?'Bearing Pile':'');
       const postSelection=postKind&&global.LumaPostConfiguration
         ? global.LumaPostConfiguration.selection(project,postKind)
         : null;
@@ -889,11 +904,12 @@
       }
       if(note){
         const tagKey=normalizeText(match.TAG),partKey=normalizeText(match.Part);
-        if(tagKey) notesByTag[tagKey]=note;
-        if(partKey) notesByPart[partKey]=note;
+        const displayNote=displayTerminology(note);
+        if(tagKey) notesByTag[tagKey]=displayNote;
+        if(partKey) notesByPart[partKey]=displayNote;
         const identityText=[calculatedItem,...resolvedKeywords].join(' ');
-        for(const code of identityText.toLowerCase().match(/k\d{6}/g)||[]) notesByTag[normalizeText(code)]=note;
-        const calculatedPartKey=normalizeText(calculatedItem); if(calculatedPartKey && !notesByPart[calculatedPartKey]) notesByPart[calculatedPartKey]=note;
+        for(const code of identityText.toLowerCase().match(/k\d{6}/g)||[]) notesByTag[normalizeText(code)]=displayNote;
+        const calculatedPartKey=normalizeText(calculatedItem); if(calculatedPartKey && !notesByPart[calculatedPartKey]) notesByPart[calculatedPartKey]=displayNote;
       }
       const totalQty=Object.values(quantitiesByPv).reduce((sum,v)=>sum+asNumber(v,0),0);
       const normalizedCalculatedItem=normalizeText(calculatedItem);
@@ -910,7 +926,7 @@
         row[`${pv}-PV Qty`]=value?niceNumber(value):'';
       });
       row['Total Qty']=niceNumber(totalQty);
-      row['Calculation Note']=note;
+      row['Calculation Note']=displayTerminology(note);
       applyBomMetadata(row,calculatedItem,match);
       if(quantityOverrideKey) row._quantity_override_key=quantityOverrideKey;
       rows.push(row);
@@ -955,7 +971,7 @@
     return partMaster.map((record,index)=>{
       const row={'No.':index+1,'Part Name':record.Part??'',TAG:record.TAG??'',Description:record.Description??'','Part Number':record['Part Number']??'',Category:record.Category??'',Unit:record.Unit??'',Material:record.Material??'',Weight:record.Weight??''};
       const tag=normalizeText(record.TAG),part=normalizeText(record.Part);
-      row['Calculation Note']=bomResult.notesByTag[tag] ?? bomResult.notesByPart[part] ?? record['Calculation Note'] ?? '';
+      row['Calculation Note']=displayTerminology(bomResult.notesByTag[tag] ?? bomResult.notesByPart[part] ?? record['Calculation Note'] ?? '');
       row._part_master_index=index;
       return row;
     });
@@ -976,7 +992,7 @@
 
   global.LumaEngine={
     PART_COLUMNS,DEFAULT_INPUTS,BOM_DEFINITIONS,BOM_DEFAULT_METADATA,ANEMOMETER_ELEVATION_THRESHOLD_M,ANEMOMETER_OPTIONS,
-    normalizeText,asNumber,asInt,niceNumber,firstNonEmpty,ceilHalf,ceilUp,
+    normalizeText,displayTerminology,asNumber,asInt,niceNumber,firstNonEmpty,ceilHalf,ceilUp,
     fastenerPartNameFromDescription,normalizePartMasterData,defaultTrackerQuantities,defaultManualParts,defaultBearingRule,normalizeBearingRule,BEARING_RULE_MODES,normalizeBearingMode,bearingRuleVariantKey,normalizeBearingRuleVariants,
     getDesignInputs,calculateAutoPvModuleGap,getAnemometerSelection,cadBlocksAreAvailable,getBomModeText,getSpanLimits,estimateSpanCountForLength,
     calculateTrackerGeometry,getBearingRuleVariantsForPv,getBearingRuleForPv,getPositionsFromRule,classifyBearing,classifyBeamZoneForPosition,calculateEstimatedBearingPositions,calculateBearingLayoutForTracker,

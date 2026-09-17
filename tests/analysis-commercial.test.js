@@ -226,9 +226,9 @@ test('a single eligible supplier is used automatically while several still requi
 test('commercial runtime scripts use one cache-busting release token', () => {
   const indexSource = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
   for (const script of ['price-list-service.js', 'commercial-categories.js', 'analysis-commercial.js', 'app.js']) {
-    assert.match(indexSource, new RegExp(`${script.replace('.', '\\.') }\\?v=20260909-project-document-refs`));
+    assert.match(indexSource, new RegExp(`${script.replace('.', '\\.') }\\?v=20260917-pile-terminology`));
   }
-  assert.match(indexSource, /style\.css\?v=20260909-project-document-refs/);
+  assert.match(indexSource, /style\.css\?v=20260917-pile-terminology/);
 });
 
 test('every Analysis table uses the shared numbered sortable and filterable table', () => {
@@ -245,16 +245,17 @@ test('BOM detail Analysis tables inherit all active Project BOM columns', () => 
   assert.match(APP_SOURCE, /function analysisProjectBomColumns\(extraColumns=\[\]\)/);
   assert.match(APP_SOURCE, /current\?\.bom\?\.columns\|\|\[\]/);
   assert.match(APP_SOURCE, /analysisDetailBomColumns\(page,\['Supplier Unit Price','Price Currency','Calculated Total'\]\)/);
-  assert.match(APP_SOURCE, /analysisProjectBomColumns\(\['Qty \/ Package','Packages','Required Qty'\]\)/);
+  assert.match(APP_SOURCE, /analysisDetailBomColumns\('packaging',\['Qty \/ Package','Packages','Required Qty'\]\)/);
   assert.match(APP_SOURCE, /analysisProjectBomRow\(item\.source/);
 });
 
-test('Substructure details omit post-only geometry while Posts retains it', () => {
+test('Substructure and Fastener Packaging omit post-only geometry while Posts retains it', () => {
   for (const column of ['Post Kind','Foundation Method','Foundation Depth mm','Profile Type','Profile Details','Overall Length mm']) {
     assert.match(APP_SOURCE, new RegExp(`'${column.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`));
   }
   assert.match(APP_SOURCE, /function analysisDetailBomColumns\(page,extraColumns=\[\]\)/);
-  assert.match(APP_SOURCE, /if\(page!==\x27substructure\x27\)return columns/);
+  assert.match(APP_SOURCE, /if\(page!==\x27substructure\x27&&page!==\x27packaging\x27\)return columns/);
   assert.match(APP_SOURCE, /columns\.filter\(column=>!postOnlyColumns\.has\(column\)\)/);
   assert.match(APP_SOURCE, /analysisDetailBomColumns\(page,\['Price \/ Unit','Price Currency','Calculated Cost'\]\)/);
+  assert.match(APP_SOURCE, /analysisDetailBomColumns\('packaging',\['Qty \/ Package','Packages','Required Qty'\]\)/);
 });

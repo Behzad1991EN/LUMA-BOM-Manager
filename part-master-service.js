@@ -7,9 +7,11 @@
   const client = () => global.LumaSupabase.getClient();
   const text = value => String(value ?? '').trim();
   const normalizedMasterText = value => text(value)
-    .replace(/Main\s+Beam/gi, 'Main Tube')
+    .replace(/Main\s+Post/gi, 'Drive Pile')
+    .replace(/Bearing\s+Post/gi, 'Bearing Pile')
+    .replace(/Main\s+(?:Beam|Tube)/gi, 'Torque Tube')
     .replace(/13\s*[x×]\s*43/gi, '13 × 43');
-  const normalized = value => text(value).toLowerCase().replace(/\s+/g, ' ');
+  const normalized = value => normalizedMasterText(value).toLowerCase().replace(/\s+/g, ' ');
   const categoryOverridesByTag = Object.freeze({
     k001479:'Steel Structure / Substructure',
     k001576:'Steel Structure / Substructure',
@@ -29,10 +31,10 @@
 
   const toAppRecord = row => Object.freeze({
     id:row.id, Part:normalizedMasterText(row.part), TAG:row.tag || '', Description:normalizedMasterText(row.description),
-    'Part Number':row.part_number || '', Category:normalizedCategory(row), Unit:row.unit || '',
+    'Part Number':text(row.tag).toLowerCase()==='k001393'&&row.part_number==='EAPZFR55100000'?'ELPZFR55100000':row.part_number || '', Category:normalizedCategory(row), Unit:row.unit || '',
     Material:normalizedMasterText(row.material), Weight:row.weight ?? '',
     'Calculation Note':normalizedMasterText(row.calculation_note), Active:row.active !== false,
-    'Post Kind':row.post_kind || '', 'Foundation Method':row.foundation_method || '',
+    'Post Kind':normalizedMasterText(row.post_kind), 'Foundation Method':row.foundation_method || '',
     'Foundation Depth mm':row.foundation_depth_mm ?? '', 'Profile Type':normalizedMasterText(row.profile_type),
     'Profile Details':normalizedMasterText(row.profile_details), 'Overall Length mm':row.overall_length_mm ?? '',
     created_at:row.created_at || '', created_by:row.created_by || '',
@@ -106,7 +108,7 @@
   }
 
   function payload(record, {creating=false} = {}) {
-    const postKind = text(record['Post Kind']) || null;
+    const postKind = normalizedMasterText(record['Post Kind']) || null;
     const tag = text(record.TAG).toLowerCase();
     if (creating && !tag) throw new Error('TAG is required for a new Part Master record.');
     if (!text(record.Part) || !text(record.Description) || !text(record.Category)) {

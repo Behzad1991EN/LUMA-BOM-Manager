@@ -13,7 +13,7 @@
     {key:'Weight', label:'Weight (kg)', type:'number'},
     {key:'Calculation Note', label:'Calculation Note'},
     {key:'Active', label:'Active', type:'active'},
-    {key:'Post Kind', label:'Post Kind', type:'select'},
+    {key:'Post Kind', label:'Pile Kind', type:'select'},
     {key:'Foundation Method', label:'Foundation Method', type:'select'},
     {key:'Foundation Depth mm', label:'Foundation Depth (mm)', type:'number'},
     {key:'Profile Type', label:'Profile Type', type:'select'},
@@ -200,7 +200,7 @@
         <section class="pm-form-section pm-post-section" aria-labelledby="pmPostHeading">
           <div class="pm-form-section-heading"><span>03</span><div><h3 id="pmPostHeading">Post and Foundation Details</h3><p>Select a post type to maintain its foundation and profile configuration.</p></div></div>
           <div class="pm-form-grid pm-form-grid-three">
-            <label class="pm-form-field"><span>Post Kind</span><select data-pm-field="Post Kind"><option value="">Not a post</option>${['Main Post', 'Bearing Post'].map(option => `<option ${value['Post Kind'] === option ? 'selected' : ''}>${option}</option>`).join('')}</select></label>
+            <label class="pm-form-field"><span>Pile Kind</span><select data-pm-field="Post Kind"><option value="">Not a pile</option>${['Drive Pile', 'Bearing Pile'].map(option => `<option ${value['Post Kind'] === option ? 'selected' : ''}>${option}</option>`).join('')}</select></label>
           </div>
           <div class="pm-post-fields" data-pm-post-fields ${isPost ? '' : 'hidden'}>
             <label class="pm-form-field"><span>Foundation Method</span><select data-pm-field="Foundation Method"><option value="">Select method</option>${['Ramming', 'Foundation'].map(option => `<option ${value['Foundation Method'] === option ? 'selected' : ''}>${option}</option>`).join('')}</select></label>
@@ -229,7 +229,7 @@
       if (!record && !String(next.TAG || '').trim()) { alert('TAG is required for a new Part Master record.'); return; }
       if (!String(next.Part || '').trim() || !String(next.Description || '').trim() || !String(next.Category || '').trim()) { alert('Part, Description, and Category are required.'); return; }
       if (next['Post Kind'] && (!next['Foundation Method'] || !next['Foundation Depth mm'] || !next['Profile Type'] || !next['Overall Length mm'])) {
-        alert('Complete Foundation Method, Foundation Depth, Profile Type, and Overall Length for a post record.');
+        alert('Complete Foundation Method, Foundation Depth, Profile Type, and Overall Length for a pile record.');
         return;
       }
       try {

@@ -8,8 +8,6 @@ const vm=require('node:vm');
 const ROOT=path.join(__dirname,'..');
 const CALCULATOR_SOURCE=fs.readFileSync(path.join(ROOT,'result-cost-calculator.js'),'utf8');
 const APP_SOURCE=fs.readFileSync(path.join(ROOT,'app.js'),'utf8');
-const INDEX_SOURCE=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
-const STYLE_SOURCE=fs.readFileSync(path.join(ROOT,'style.css'),'utf8');
 
 function calculator(){const window={};vm.runInContext(CALCULATOR_SOURCE,vm.createContext({window,Object,Array,String,Number,Set}),{filename:'result-cost-calculator.js'});return window.LumaResultCostCalculator;}
 function input(overrides={}){return {materialSections:[
@@ -52,18 +50,14 @@ test('Result limits VAT to 0, 10, or 22 percent and permits negative or positive
   assert.ok(calc.calculate(input({marginPercent:5})).marginAmount>0);
 });
 
-test('Analysis Result contains the requested sections, route columns, percentage bars, and no Finance data row',()=>{
-  assert.match(INDEX_SOURCE,/src="result-cost-calculator\.js"/);
-  for(const label of ['Steel Structure','Bearing','Slew Drive','Fasteners','Electrical'])assert.match(APP_SOURCE,new RegExp(`label:'${label}'`));
-  for(const label of ['Transportation from Genoa to Site','Transportation from Italian Supplier/Warehouse to Site','Transportation from FOB China to Site','Share in Material','Share in Total'])assert.equal(APP_SOURCE.includes(label),true,label);
-  assert.match(APP_SOURCE,/result-share-bar/);
-  assert.match(STYLE_SOURCE,/\.result-share-bar\.material[\s\S]*#F6A623/);
-  assert.match(STYLE_SOURCE,/\.result-share-bar\.total[\s\S]*#15968B/);
-  assert.match(APP_SOURCE,/origin_to_port_per_container/);
-  assert.match(APP_SOURCE,/port_to_site_per_container/);
-  assert.match(APP_SOURCE,/warehouse_to_site_per_container/);
-  assert.match(APP_SOURCE,/page:'result',title:'Result'/);
-  assert.doesNotMatch(APP_SOURCE,/\{[^\n]*label:'Finance/);
+test('Analysis removes the duplicate Result destination and gives Packaging its own section',()=>{
+  assert.match(APP_SOURCE,/page:'total',title:'Overhead & Final Price'/);
+  assert.match(APP_SOURCE,/\['Summary',\['total'\]\]/);
+  assert.match(APP_SOURCE,/\['Packaging',\['packaging'\]\]/);
+  assert.doesNotMatch(APP_SOURCE,/page:'result',title:'Result'/);
+  assert.doesNotMatch(APP_SOURCE,/\['Result',\['result'\]\]/);
+  assert.doesNotMatch(APP_SOURCE,/else if\(page==='result'\)renderResultAnalysis\(\)/);
+  assert.doesNotMatch(APP_SOURCE,/\['Summary',\['total','packaging'\]\]/);
 });
 
 test('Posts and Substructure audit keeps requested TAGs and exact post separation',()=>{

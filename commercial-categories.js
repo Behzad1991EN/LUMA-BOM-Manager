@@ -69,14 +69,14 @@
     if (CATEGORY_OVERRIDES_BY_TAG[tag]) return CATEGORY_OVERRIDES_BY_TAG[tag];
     if (category.startsWith('fastener')) return 'fasteners';
     // Explicit Part Master leaf categories are authoritative. Check them before
-    // names/descriptions so a Substructure connection that mentions Main Post or
-    // Bearing Post cannot leak into the Posts Analysis section.
+    // names/descriptions so a Substructure connection that mentions a pile
+    // cannot leak into the Posts Analysis section.
     if (category === 'post' || category === 'posts' || category === 'steelstructurepost' || category === 'steelstructureposts') return 'posts';
     if (category === 'substructure' || category === 'steelstructuresubstructure') return 'substructure';
     // Compatibility for legacy records still stored as plain Steel Structure:
-    // only the actual configured Main Post and Bearing Post records are Posts.
+    // only the actual configured Drive Pile and Bearing Pile records are Posts.
     if (category === 'steelstructure') {
-      if (postKind === 'mainpost' || postKind === 'bearingpost' || partIdentity.includes('mainpost') || partIdentity.includes('bearingpost')) return 'posts';
+      if (['mainpost','bearingpost','drivepile','bearingpile'].includes(postKind) || ['mainpost','bearingpost','drivepile','bearingpile'].some(name=>partIdentity.includes(name))) return 'posts';
       return 'substructure';
     }
     if (category.startsWith('pvmodule') || identity === 'pvmodule') return 'pv_module';

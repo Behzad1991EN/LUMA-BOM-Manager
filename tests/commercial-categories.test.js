@@ -30,6 +30,8 @@ test('Part Master fields resolve the intended commercial leaf categories', () =>
   const categories = loadCategories();
   const fixtures = [
     [{Category:'Steel Structure', Part:'Main Post', 'Post Kind':'Main Post'}, 'posts'],
+    [{Category:'Steel Structure', Part:'Drive Pile', 'Post Kind':'Drive Pile'}, 'posts'],
+    [{Category:'Steel Structure', Part:'Bearing Pile', 'Post Kind':'Bearing Pile'}, 'posts'],
     [{Category:'Steel Structure / Post', Part:'Main Post'}, 'posts'],
     [{Category:'Steel Structure / Post', Part:'Bearing Post'}, 'posts'],
     [{Category:'Steel Structure', Part:'Main Tube A'}, 'substructure'],
