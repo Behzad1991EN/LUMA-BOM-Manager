@@ -63,7 +63,8 @@ test('Analysis removes the duplicate Result destination and gives Packaging its 
 test('Posts and Substructure audit keeps requested TAGs and exact post separation',()=>{
   assert.match(APP_SOURCE,/pages:Object\.freeze\(\['posts','substructure'\]\)/);
   const categorySource=fs.readFileSync(path.join(ROOT,'commercial-categories.js'),'utf8'),window={};vm.runInContext(categorySource,vm.createContext({window,Object,String}),{filename:'commercial-categories.js'});const categories=window.LumaCommercialCategories;
-  for(const record of [{TAG:'k001119',Category:'Steel Structure',Part:'Bearing Adapter'},{TAG:'k001479',Category:'Fastener / Main Beam',Part:'Tube Spacer'},{TAG:'k001576',Category:'Fasteners / Hat rail',Part:'Square Washer'}])assert.equal(categories.leafKeyForPart(record),'substructure',record.TAG);
+  for(const record of [{TAG:'k001119',Category:'Steel Structure',Part:'Bearing Adapter'},{TAG:'k001576',Category:'Fasteners / Hat rail',Part:'Square Washer'}])assert.equal(categories.leafKeyForPart(record),'substructure',record.TAG);
+  assert.equal(categories.leafKeyForPart({TAG:'k001479',Category:'Fasteners / Main Tube - Main Tube',Part:'Tube Spacer'}),'fasteners');
   for(const record of [{Category:'Steel Structure / Post',Part:'Main Post'},{Category:'Steel Structure / Post',Part:'Bearing Post'}])assert.equal(categories.leafKeyForPart(record),'posts',record.Part);
   for(const record of [{Category:'Steel Structure / Substructure',Part:'Slew Drive Seat - Main Post'},{Category:'Steel Structure / Substructure',Part:'Bearing Adapter',Description:'Connection to Bearing Post'}])assert.equal(categories.leafKeyForPart(record),'substructure',record.Part);
 });

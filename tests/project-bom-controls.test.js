@@ -64,6 +64,6 @@ test('Project BOM selected rows match the VEON highlighted and keyboard-accessib
 test('browser assets share the current release cache token', () => {
   const html = read('index.html');
   for (const asset of ['style.css', 'engine.js', 'app.js']) {
-    assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=20260917-pile-terminology`));
+    assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=20260917-tube-spacer-export`));
   }
 });

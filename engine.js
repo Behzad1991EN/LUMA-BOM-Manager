@@ -21,6 +21,14 @@
       currency:'EUR',
     }),
   });
+  const PLANT_ELECTRICAL_ITEMS = Object.freeze([
+    Object.freeze({key:'k001405',tag:'k001405',label:'Safeguard M',perTrackers:48}),
+    Object.freeze({key:'k001406',tag:'k001406',label:'Safeguard S',perTrackers:48}),
+    Object.freeze({key:'k001542',tag:'k001542',label:'SCADA Enclosure GW40028',perTrackers:48}),
+    Object.freeze({key:'anemometer',tag:null,label:'Anemometer',perTrackers:48}),
+    Object.freeze({key:'k001552',tag:'k001552',label:'SCADA Power Supply HDR-30-24',perTrackers:100}),
+    Object.freeze({key:'k001525',tag:'k001525',label:'Higeco GWC V4 4DIN',perTrackers:100}),
+  ]);
 
   function normalizeText(value){
     return String(value ?? '').trim().toLowerCase().replaceAll('×','x').replace(/[^a-z0-9]+/g,'');
@@ -737,13 +745,25 @@
   }
   function normalizeSoltrkVersion(value){ return String(value||'2.0').trim()==='3.0'?'3.0':'2.0'; }
   function scheduleRowIdentity(row){return String(row?._schedule_key||`${asInt(row?.['PV Modules per Tracker'],0)}:default`);}
-  function distributeEquipmentQuantities(project,rows,overrideKey,automaticFormula){
+  function torqueTubeJointCountForRow(row){
+    // Each tracker has one inner joint on each side: A–B for long trackers,
+    // or Slew Drive Connection–B for short trackers. C adds one joint per side.
+    return 2
+      +(asNumber(row?.['Main Tube C Required Length North'],0)>0?1:0)
+      +(asNumber(row?.['Main Tube C Required Length South'],0)>0?1:0);
+  }
+  function torqueTubeConnectionFastenersForRow(row){
+    return 4*torqueTubeJointCountForRow(row)*asInt(row?.['Number of Trackers'],0);
+  }
+  function distributeEquipmentQuantities(project,rows,overrideKey,automaticFormula,wholePlantAutomaticTotal=null){
     if(!rows.length) return {};
     const automatic=rows.map(row=>Math.max(0,asInt(automaticFormula(row),0)));
     const override=project?.equipment_quantity_overrides?.[overrideKey];
-    if(override===undefined || override===null || override==='') return Object.fromEntries(rows.map((row,index)=>[scheduleRowIdentity(row),automatic[index]]));
-    const total=Math.max(0,asInt(override,0));
-    let weights=[...automatic],weightTotal=weights.reduce((sum,value)=>sum+value,0);
+    const hasOverride=override!==undefined && override!==null && override!=='';
+    if(!hasOverride && wholePlantAutomaticTotal===null) return Object.fromEntries(rows.map((row,index)=>[scheduleRowIdentity(row),automatic[index]]));
+    const total=Math.max(0,asInt(hasOverride?override:wholePlantAutomaticTotal,0));
+    let weights=wholePlantAutomaticTotal===null?[...automatic]:rows.map(row=>Math.max(0,asInt(row['Number of Trackers'],0)));
+    let weightTotal=weights.reduce((sum,value)=>sum+value,0);
     if(weightTotal<=0){weights=rows.map(row=>Math.max(0,asInt(row['Number of Trackers'],0)));weightTotal=weights.reduce((sum,value)=>sum+value,0);}
     if(weightTotal<=0){weights=rows.map(()=>1);weightTotal=weights.length;}
     const raw=weights.map(weight=>weightTotal?total*weight/weightTotal:0);
@@ -755,10 +775,19 @@
   }
   function equipmentQuantityAllocation(project,rows=[]){
     const activeRows=(Array.isArray(rows)?rows:[]).filter(row=>asInt(row?.['Number of Trackers'],0)>0);
+    const totalTrackers=activeRows.reduce((sum,row)=>sum+asInt(row['Number of Trackers'],0),0);
     const automaticSoltrk=activeRows.reduce((sum,row)=>sum+ceilHalf(asInt(row['Number of Trackers'])),0);
     const automaticJunctionBox=activeRows.reduce((sum,row)=>sum+Math.floor(asInt(row['Number of Trackers'])/2),0);
     const soltrkByPv=distributeEquipmentQuantities(project,activeRows,'soltrk',row=>ceilHalf(asInt(row['Number of Trackers'])));
     const junctionBoxByPv=distributeEquipmentQuantities(project,activeRows,'junction_box',row=>Math.floor(asInt(row['Number of Trackers'])/2));
+    const plantAutomaticByKey={},plantByKey={},plantTotalsByKey={};
+    for(const item of PLANT_ELECTRICAL_ITEMS){
+      const automaticTotal=Math.ceil(totalTrackers/item.perTrackers);
+      const byRow=distributeEquipmentQuantities(project,activeRows,item.key,row=>asInt(row['Number of Trackers']),automaticTotal);
+      plantAutomaticByKey[item.key]=automaticTotal;
+      plantByKey[item.key]=byRow;
+      plantTotalsByKey[item.key]=Object.values(byRow).reduce((sum,value)=>sum+asInt(value),0);
+    }
     return {
       automaticSoltrk,
       automaticJunctionBox,
@@ -766,9 +795,14 @@
       junctionBox:Object.values(junctionBoxByPv).reduce((sum,value)=>sum+asInt(value),0),
       soltrkByPv,
       junctionBoxByPv,
+      totalTrackers,
+      plantAutomaticByKey,
+      plantByKey,
+      plantTotalsByKey,
     };
   }
   function contextEquipmentQty(context,key,row){ return asInt(context?.[`${key}ByPv`]?.[scheduleRowIdentity(row)],0); }
+  function contextPlantEquipmentQty(context,key,row){ return asInt(context?.plantByKey?.[key]?.[scheduleRowIdentity(row)],0); }
   function applyBomMetadata(row,calculatedItem,sourceRecord=null){
     const defaults=defaultBomMetadata(row,calculatedItem),source=sourceRecord&&typeof sourceRecord==='object'?sourceRecord:{};
     row.Material=Object.prototype.hasOwnProperty.call(source,'Material')?source.Material:defaults.Material;
@@ -797,9 +831,11 @@
     ['Module Rail Elevation Plate',r=>2*asInt(r['Bearing 100 / Tracker'])*asInt(r['Number of Trackers']),['k001573','module elevation plate','elevation plate','module rail elevation plate'],'Module Rails / Support','2 × Bearing 100'],
     ['Limit Switch Holder',r=>asInt(r['Number of Trackers']),['limit switch holder'],'Steel Structure','Main Post'],
     ['Limit Switch Trigger',r=>asInt(r['Number of Trackers']),['limit switch trigger','limit switch frame'],'Steel Structure','Main Post'],
-    ['SOLTRK Holder',(r,c)=>contextEquipmentQty(c,'soltrk',r),c=>c.soltrkVersion==='3.0'?['k001568']:['k001505'],'Steel Structure','1 × SOLTRK'],
+    ['SOLTRK Holder / External Plate',(r,c)=>contextEquipmentQty(c,'soltrk',r),c=>c.soltrkVersion==='3.0'?['k001568']:['k001505'],'Steel Structure / Substructure','1 × SOLTRK'],
+    ['SOLTRK 3.0 Internal Plate',(r,c)=>c.soltrkVersion==='3.0'?contextEquipmentQty(c,'soltrk',r):0,['k001579'],'Steel Structure / Substructure','1 × SOLTRK 3.0'],
+    ['SOLTRK 3.0 Logo Plate',(r,c)=>c.soltrkVersion==='3.0'?contextEquipmentQty(c,'soltrk',r):0,['k001569'],'Steel Structure / Substructure','1 × SOLTRK 3.0'],
     ['Junction Box Holder',(r,c)=>contextEquipmentQty(c,'junctionBox',r),['k001511','junction box holder','junction holder','j-box holder'],'Steel Structure','1 × Junction Box'],
-    ['k001538 - Anemometer Bracket',r=>ceilUp(asInt(r['Number of Trackers'])/48),['k001538','anemometer bracket','anemometer holder plate'],'Steel Structure','Round up (Tracker / 48) per array configuration'],
+    ['k001538 - Anemometer Bracket',(r,c)=>contextPlantEquipmentQty(c,'anemometer',r),['k001538','anemometer bracket','anemometer holder plate'],'Steel Structure','1 × selected Anemometer for the whole plant'],
     ['Bearing 120',r=>asInt(r['Bearing 120 / Tracker'])*asInt(r['Number of Trackers']),['bearing 120','gsqb 120','120 bearing'],'Drive / Bearing','Calculated from bearing post positions on 120 beam zone'],
     ['Bearing 110',r=>asInt(r['Bearing 110 / Tracker'])*asInt(r['Number of Trackers']),['bearing 110','gsqb 110','110 bearing'],'Drive / Bearing','Calculated from bearing post positions on 110 beam zone'],
     ['Bearing 100',r=>asInt(r['Bearing 100 / Tracker'])*asInt(r['Number of Trackers']),['bearing 100','gsqb 100','100 bearing'],'Drive / Bearing','Calculated from bearing post positions on 100 beam zone'],
@@ -809,13 +845,13 @@
     ['SOLTRK',(r,c)=>contextEquipmentQty(c,'soltrk',r),c=>c.soltrkVersion==='3.0'?['k001549']:['k001534'],'Electrical','Editable total; automatic default is round up (Main Post / 2)'],
     ['Junction Box',(r,c)=>contextEquipmentQty(c,'junctionBox',r),['junction box','j-box','junction'],'Electrical','Editable total; automatic default is round down (Tracker / 2)'],
     ['k001390 - Cable gland pg13.5',r=>2*asInt(r['Number of Trackers']),['k001390','cable gland','pg13.5'],'Electrical','2 × Tracker'],
-    ['k001405 - Safeguard-M48V-8-13_rev03',r=>ceilUp((1/48)*asInt(r['Number of Trackers'])),['k001405','safeguard','m48v'],'Electrical','Round up ((1/48) × Tracker)'],
-    ['k001406 - Safeguard-S48V-8-13_rev03',r=>ceilUp((1/48)*asInt(r['Number of Trackers'])),['k001406','safeguard','s48v'],'Electrical','Round up ((1/48) × Tracker)'],
-    ['k001525 - Higeco GWC V4 4DIN',r=>ceilUp(.01*asInt(r['Number of Trackers'])),['k001525','higeco','gwc','4din','power supply'],'Electrical','Round up (0.01 × Tracker)'],
-    ['k001552 - Scada Power supply HDR-30-24',r=>ceilUp(.01*asInt(r['Number of Trackers'])),['k001552','scada','power supply','hdr-30-24'],'Electrical','Round up (0.01 × Tracker)'],
-    ['k001542 - Scada enclosure GW40028',r=>ceilUp(.01*asInt(r['Number of Trackers'])),['k001542','scada','enclosure','gw40028','electrical enclosure'],'Electrical','Round up (0.01 × Tracker)'],
-    ['Anemometer for Cold Weather (above 400)',(r,c)=>c.anemometer.key==='cold'?ceilUp((1/48)*asInt(r['Number of Trackers'])):0,['k001536','anemometer','nuovaceva','0103011303'],'Electrical','Elevation ≥ 400 m ASL: round up ((1/48) × Tracker)'],
-    ['Anemometer for Normal Weather',(r,c)=>c.anemometer.key==='normal'?ceilUp((1/48)*asInt(r['Number of Trackers'])):0,['k001596','anemometer','nuovaceva','0103010805'],'Electrical','Elevation < 400 m ASL: round up ((1/48) × Tracker)'],
+    ['k001405 - Safeguard-M48V-8-13_rev03',(r,c)=>contextPlantEquipmentQty(c,'k001405',r),['k001405','safeguard','m48v'],'Electrical','One per 48 trackers across the whole plant; project total may be overridden'],
+    ['k001406 - Safeguard-S48V-8-13_rev03',(r,c)=>contextPlantEquipmentQty(c,'k001406',r),['k001406','safeguard','s48v'],'Electrical','One per 48 trackers across the whole plant; project total may be overridden'],
+    ['k001525 - Higeco GWC V4 4DIN',(r,c)=>contextPlantEquipmentQty(c,'k001525',r),['k001525','higeco','gwc','4din','power supply'],'Electrical','One per 100 trackers across the whole plant; project total may be overridden'],
+    ['k001552 - Scada Power supply HDR-30-24',(r,c)=>contextPlantEquipmentQty(c,'k001552',r),['k001552','scada','power supply','hdr-30-24'],'Electrical','One per 100 trackers across the whole plant; project total may be overridden'],
+    ['k001542 - Scada enclosure GW40028',(r,c)=>contextPlantEquipmentQty(c,'k001542',r),['k001542','scada','enclosure','gw40028','electrical enclosure'],'Electrical','One per 48 trackers across the whole plant; project total may be overridden'],
+    ['Anemometer for Cold Weather (above 400)',(r,c)=>c.anemometer.key==='cold'?contextPlantEquipmentQty(c,'anemometer',r):0,['k001536','anemometer','nuovaceva','0103011303'],'Electrical','Elevation ≥ 400 m ASL: one per 48 trackers across the whole plant; project total may be overridden'],
+    ['Anemometer for Normal Weather',(r,c)=>c.anemometer.key==='normal'?contextPlantEquipmentQty(c,'anemometer',r):0,['k001596','anemometer','nuovaceva','0103010805'],'Electrical','Elevation < 400 m ASL: one per 48 trackers across the whole plant; project total may be overridden'],
     ['k001164 - DIN 933 ISO 4017 - M20 × 55',r=>8*asInt(r['Number of Trackers']),['k001164','din 933','iso 4017','m20','55'],'Fasteners / Slew Drive Seat - Main Post','8 × Main Post'],
     ['k001010 - DIN 934 ISO 4032 - M20',r=>8*asInt(r['Number of Trackers']),['k001010','din 934','iso 4032','m20'],'Fasteners / Slew Drive Seat - Main Post','8 × Main Post'],
     ['k001154 - DIN 125 ISO 7089 - A21 (M20)',r=>16*asInt(r['Number of Trackers']),['k001154','din 125','iso 7089','a21','m20'],'Fasteners / Slew Drive Seat - Main Post','16 × Main Post'],
@@ -836,9 +872,9 @@
     ['k001385 - DIN 933 ISO 4017 - M16 × 30',r=>16*asInt(r['Number of Trackers']),['k001385','din 933','iso 4017','m16','30'],'Fasteners / Main Tubes','16 × Main Post'],
     ['k001127 - DIN 125 ISO 7089 - A17 (M16)',r=>22*asInt(r['Number of Trackers']),['k001127','din 125','iso 7089','a17','m16'],'Fasteners / Main Tubes','22 × Tracker'],
     ['k001166 - DIN 127B - A16',r=>16*asInt(r['Number of Trackers']),['k001166','din 127b','a16'],'Fasteners / Main Tubes','16 × Main Post'],
-    ['k001388 - DIN 93x Special Thread - M12 × 150 - 46',r=>16*asInt(r['Number of Trackers']),['k001388','din 93x','m12','150'],'Fasteners / Main Tubes','8 × Main Tube B'],
-    ['k001157 - DIN 9021 ISO 7093 - 13 (M12)',r=>32*asInt(r['Number of Trackers']),['k001157','din 9021','iso 7093','m12','13'],'Fasteners / Main Tubes','16 × Main Tube B'],
-    ['k001013 - DIN 982 ISO 7040 - M12',r=>16*asInt(r['Number of Trackers']),['k001013','din 982','iso 7040','m12'],'Fasteners / Main Tubes','= k001388 = 8 × Main Tube B'],
+    ['k001388 - DIN 93x Special Thread - M12 × 150 - 46',r=>torqueTubeConnectionFastenersForRow(r),['k001388','din 93x','m12','150'],'Fasteners / Torque Tubes','4 × each active tube joint: inner joint on each side, plus each B–C joint'],
+    ['k001157 - DIN 9021 ISO 7093 - 13 (M12)',r=>2*torqueTubeConnectionFastenersForRow(r),['k001157','din 9021','iso 7093','m12','13'],'Fasteners / Torque Tubes','2 × k001388'],
+    ['k001013 - DIN 982 ISO 7040 - M12',r=>torqueTubeConnectionFastenersForRow(r),['k001013','din 982','iso 7040','m12'],'Fasteners / Torque Tubes','1 × k001388'],
     ['k001151 - DIN 93x Special Thread - M8 × 150 - 50',r=>8*asInt(r['Number of Trackers']),['k001151','din 93x','m8','150'],'Fasteners / Module Rails','2 × Z Rail'],
     ['k001239 - DIN 522 - 19 × 39 × 3 (M18)',r=>4*asInt(r['Number of Trackers']),['k001239','din 522','19','39','m18'],'Fasteners / Slew Drive','4 × Tracker'],
     ['k001576 - Square Washer 38×38×9.5×6 (M8)',r=>2*Math.max(asInt(r['PV Modules per Tracker'])-2,0)*asInt(r['Number of Trackers']),['k001576','square washer','38×38','38x38','hat rail'],'Fasteners / Hat rail','2 × Hat rail'],
@@ -853,9 +889,9 @@
     ['k001510 - DIN 912 ISO 4762 - M4 × 25',(r,c)=>c.soltrkVersion==='2.0'?4*contextEquipmentQty(c,'soltrk',r):0,['k001510','din 912','iso 4762','m4','25'],'Fasteners / SOLTRK','SOLTRK 2.0 only: 4 × SOLTRK'],
     ['k001402 - DIN 982 ISO 7040 - M4',(r,c)=>4*contextEquipmentQty(c,'soltrk',r)+4*asInt(r['Number of Trackers']),['k001402','din 982','iso 7040','m4'],'Fasteners / SOLTRK + Limit Switch','4 × SOLTRK + 2 × Limit Switch'],
     ['k001454 - DIN 7985 ISO 7045 - M5 × 16',(r,c)=>4*contextEquipmentQty(c,'junctionBox',r)+(c.soltrkVersion==='3.0'?4*contextEquipmentQty(c,'soltrk',r):0),['k001454','din 7985','iso 7045','m5','16'],'Fasteners / Junction Box + SOLTRK 3.0','4 × Junction Box + (SOLTRK 3.0: 4 × SOLTRK)'],
-    ['k001513 - DIN 982 ISO 7040 - M5',(r,c)=>4*contextEquipmentQty(c,'junctionBox',r)+(c.soltrkVersion==='3.0'?4*contextEquipmentQty(c,'soltrk',r):0)+ceilUp((3/48)*asInt(r['Number of Trackers'])),['k001513','din 982','iso 7040','m5'],'Fasteners / Junction Box + SOLTRK 3.0 Holder Plate + Anemometer','4 × Junction Box + (SOLTRK 3.0: 4 × SOLTRK 3.0 Holder Plate) + round up ((3/48) × Tracker) for Anemometer, per array configuration'],
-    ['k001539 - DIN 7985 ISO 7045 - M5 × 20',r=>3*ceilUp(asInt(r['Number of Trackers'])/48),['k001539','din 7985','iso 7045','m5','20'],'Fasteners / Anemometer','Anemometer Bracket × 3'],
-    ['k001479 - Tube Spacer',r=>32*asInt(r['Number of Trackers']),['k001479','tube spacer','m12','16','12.7','13.3'],'Fastener','2 × k001388'],
+    ['k001513 - DIN 982 ISO 7040 - M5',(r,c)=>4*contextEquipmentQty(c,'junctionBox',r)+(c.soltrkVersion==='3.0'?4*contextEquipmentQty(c,'soltrk',r):0)+3*contextPlantEquipmentQty(c,'anemometer',r),['k001513','din 982','iso 7040','m5'],'Fasteners / Junction Box + SOLTRK 3.0 External Plate + Anemometer','4 × Junction Box + (SOLTRK 3.0: 4 × SOLTRK 3.0 External Plate) + 3 × selected Anemometer'],
+    ['k001539 - DIN 7985 ISO 7045 - M5 × 20',(r,c)=>3*contextPlantEquipmentQty(c,'anemometer',r),['k001539','din 7985','iso 7045','m5','20'],'Fasteners / Anemometer','3 × selected Anemometer'],
+    ['k001479 - Tube Spacer',r=>2*torqueTubeConnectionFastenersForRow(r),['k001479','tube spacer','m12','16','12.7','13.3'],'Fasteners / Main Tube - Main Tube','2 × k001388'],
   ];
 
   function buildProjectBom(project,activeSchedule,partMaster,partMasterColumns=PART_COLUMNS){
@@ -878,6 +914,7 @@
       anemometer:getAnemometerSelection(project),
       soltrkByPv:equipmentAllocation.soltrkByPv,
       junctionBoxByPv:equipmentAllocation.junctionBoxByPv,
+      plantByKey:equipmentAllocation.plantByKey,
     };
 
     for(const [calculatedItem,formula,keywords,categoryFallback,note,unit='pcs'] of BOM_DEFINITIONS){
@@ -913,7 +950,10 @@
       }
       const totalQty=Object.values(quantitiesByPv).reduce((sum,v)=>sum+asNumber(v,0),0);
       const normalizedCalculatedItem=normalizeText(calculatedItem);
-      const quantityOverrideKey=normalizedCalculatedItem==='soltrk'?'soltrk':(normalizedCalculatedItem==='junctionbox'?'junction_box':'');
+      const matchTag=normalizeText(match.TAG);
+      const plantItem=PLANT_ELECTRICAL_ITEMS.find(item=>
+        matchTag===normalizeText(item.key==='anemometer'?bomContext.anemometer.tag:item.tag));
+      const quantityOverrideKey=normalizedCalculatedItem==='soltrk'?'soltrk':(normalizedCalculatedItem==='junctionbox'?'junction_box':(plantItem?.key||''));
       if(totalQty<=0 && !quantityOverrideKey) continue;
       const row={};
       for(const column of baseColumns) row[column]=match[column] ?? '';
@@ -991,12 +1031,12 @@
   }
 
   global.LumaEngine={
-    PART_COLUMNS,DEFAULT_INPUTS,BOM_DEFINITIONS,BOM_DEFAULT_METADATA,ANEMOMETER_ELEVATION_THRESHOLD_M,ANEMOMETER_OPTIONS,
+    PART_COLUMNS,DEFAULT_INPUTS,BOM_DEFINITIONS,BOM_DEFAULT_METADATA,ANEMOMETER_ELEVATION_THRESHOLD_M,ANEMOMETER_OPTIONS,PLANT_ELECTRICAL_ITEMS,
     normalizeText,displayTerminology,asNumber,asInt,niceNumber,firstNonEmpty,ceilHalf,ceilUp,
     fastenerPartNameFromDescription,normalizePartMasterData,defaultTrackerQuantities,defaultManualParts,defaultBearingRule,normalizeBearingRule,BEARING_RULE_MODES,normalizeBearingMode,bearingRuleVariantKey,normalizeBearingRuleVariants,
     getDesignInputs,calculateAutoPvModuleGap,getAnemometerSelection,cadBlocksAreAvailable,getBomModeText,getSpanLimits,estimateSpanCountForLength,
     calculateTrackerGeometry,getBearingRuleVariantsForPv,getBearingRuleForPv,getPositionsFromRule,classifyBearing,classifyBeamZoneForPosition,calculateEstimatedBearingPositions,calculateBearingLayoutForTracker,
     generateModuleRailPositionsForSide,closestRailIndicesAroundPosition,calculateModuleSupportPlatesForTracker,buildSchedule,buildBearingLayoutTable,buildModuleSupportLayoutTable,
-    recordIsFastener,itemIsFastener,recordIsValidForCalculatedItem,findPartMasterMatch,bomRowKey,normalizeSoltrkVersion,scheduleRowIdentity,equipmentQuantityAllocation,buildProjectBom,buildPartMasterPreview,calculateProject,
+    recordIsFastener,itemIsFastener,recordIsValidForCalculatedItem,findPartMasterMatch,bomRowKey,normalizeSoltrkVersion,scheduleRowIdentity,torqueTubeJointCountForRow,equipmentQuantityAllocation,buildProjectBom,buildPartMasterPreview,calculateProject,
   };
 })(globalThis);

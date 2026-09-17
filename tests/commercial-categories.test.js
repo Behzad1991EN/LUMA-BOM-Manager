@@ -22,7 +22,7 @@ test('legacy category names normalize centrally with only approved migration-com
   assert.equal(categories.normalizeCategoryKey('Steel Structure / Substructure'), 'substructure');
   assert.equal(categories.normalizeCategoryKey('Bearings'), 'bearing');
   assert.equal(categories.normalizeCategoryKey('Fasteners / Limit Switch'), 'fasteners');
-  assert.match(source, /k001479: 'substructure'/);
+  assert.doesNotMatch(source, /k001479: 'substructure'/);
   assert.match(source, /k001576: 'substructure'/);
 });
 
@@ -47,6 +47,7 @@ test('Part Master fields resolve the intended commercial leaf categories', () =>
     [{Category:'Electrical', Part:'Electrical Enclosure'}, 'electrical_enclosure'],
     [{Category:'Bearings', Part:'Bearing'}, 'bearing'],
     [{Category:'Fasteners / Junction Box', Part:'Bolt'}, 'fasteners'],
+    [{TAG:'k001479', Category:'Fasteners / Main Tube - Main Tube', Part:'Tube Spacer'}, 'fasteners'],
   ];
   for (const [record, expected] of fixtures) assert.equal(categories.leafKeyForPart(record), expected);
   assert.equal(categories.partMatchesCategory(fixtures[0][0], 'Posts'), true);
@@ -58,11 +59,10 @@ test('Part Master fields resolve the intended commercial leaf categories', () =>
     ['k001162', 'Slew Drive Seat'], ['k001576', 'Square Washer'],
     ['k001389', 'Limit Switch Holder'], ['k001397', 'Limit Switch Trigger'],
     ['k001568', 'SOLTRK 3.0 Holder'], ['k001511', 'Junction Box Holder'],
-    ['k001479', 'Tube Spacer'],
   ];
   for (const [tag, part] of substructureParts) {
     const description = tag === 'k001119' ? 'Luma lateral pile head' : '';
-    const category = ['k001479', 'k001576'].includes(tag) ? 'Fasteners / Legacy' : 'Steel Structure';
+    const category = tag === 'k001576' ? 'Fasteners / Legacy' : 'Steel Structure';
     assert.equal(categories.partMatchesCategory({TAG:tag, Category:category, Part:part, Description:description}, 'Substructure'), true, tag);
   }
   assert.equal(categories.partMatchesCategory({category:'Electrical', part:'Cable Gland'}, 'Cable Gland'), true);

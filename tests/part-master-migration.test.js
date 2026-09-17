@@ -124,7 +124,7 @@ test('Part Master service caches one database load and resolves exact active pos
     {id:'1',part:'Main Post',tag:'k001152',description:'Main',category:'Steel Structure',active:true,post_kind:'Main Post',foundation_method:'Ramming',foundation_depth_mm:2000,profile_type:'HEA 140'},
     {id:'2',part:'Bearing Post',tag:'k001120',description:'Bearing',category:'Steel Structure',active:true,post_kind:'Bearing Post',foundation_method:'Ramming',foundation_depth_mm:2000,profile_type:'C'},
     {id:'3',part:'Old',tag:'old',description:'Old',category:'Steel Structure',active:false},
-    {id:'4',part:'Tube Spacer',tag:'k001479',description:'Spacer',category:'Fastener / Main Beam',active:true},
+    {id:'4',part:'Tube Spacer',tag:'k001479',description:'M12 × 16 × 12.7 × 13.3',category:'Fasteners / Main Tube - Main Tube',active:true},
     {id:'5',part:'Limit Switch',tag:'k001393',part_number:'EAPZFR55100000',description:'Limit switch',category:'Electrical',active:true},
   ];
   let requests = 0;
@@ -137,7 +137,7 @@ test('Part Master service caches one database load and resolves exact active pos
   assert.equal(window.LumaPartMasterService.getAllParts().length, 5);
   assert.equal(window.LumaPartMasterService.getActiveParts().length, 4);
   assert.equal(window.LumaPartMasterService.getPartByTag('K001152').Part, 'Drive Pile');
-  assert.equal(window.LumaPartMasterService.getPartByTag('K001479').Category, 'Steel Structure / Substructure');
+  assert.equal(window.LumaPartMasterService.getPartByTag('K001479').Category, 'Fasteners / Main Tube - Main Tube');
   assert.equal(window.LumaPartMasterService.getPartByTag('K001393')['Part Number'], 'ELPZFR55100000');
   const match = window.LumaPartMasterService.findPostConfiguration({postKind:'Drive Pile',foundationMethod:'Ramming',foundationDepthMm:2000,profileType:'HEA 140'});
   assert.equal(match.status, 'found');
@@ -201,6 +201,6 @@ test('Part Master add and edit form uses organized responsive field sections', (
   assert.match(styles, /\.pm-form-grid-three/);
   assert.match(styles, /\.pm-post-fields\[hidden\]/);
   assert.match(styles, /@media \(max-width: 700px\)/);
-  assert.match(html, /style\.css\?v=20260917-pile-terminology/);
+  assert.match(html, /style\.css\?v=20260917-tube-spacer-export/);
   assert.match(html, /admin-part-master\.js\?v=20260917-pile-terminology/);
 });

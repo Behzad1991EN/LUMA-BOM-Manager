@@ -13,10 +13,14 @@
     .replace(/13\s*[x×]\s*43/gi, '13 × 43');
   const normalized = value => normalizedMasterText(value).toLowerCase().replace(/\s+/g, ' ');
   const categoryOverridesByTag = Object.freeze({
-    k001479:'Steel Structure / Substructure',
     k001576:'Steel Structure / Substructure',
   });
-  const normalizedCategory = row => categoryOverridesByTag[text(row?.tag).toLowerCase()] || normalizedMasterText(row?.category);
+  const normalizedCategory = row => {
+    const category=text(row?.category);
+    // Keep the explicitly named Tube Spacer connection category as supplied.
+    if(text(row?.tag).toLowerCase()==='k001479' && category==='Fasteners / Main Tube - Main Tube')return category;
+    return categoryOverridesByTag[text(row?.tag).toLowerCase()] || normalizedMasterText(category);
+  };
 
   function publicMessage(error) {
     console.error('Part Master database operation failed.', {code:error?.code || 'unknown'});

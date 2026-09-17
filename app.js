@@ -776,7 +776,11 @@ function rowMatchesSearch(row,text){
 }
 function bomProjectSettingsHtml(project,allocation){
   const contingencyPercent=Math.min(100,Math.max(0,E.asNumber(project.fastener_contingency_percent,0))),version=E.normalizeSoltrkVersion(project.soltrk_version),overrides=project.equipment_quantity_overrides||{};
-  return `<div class="bom-controls" aria-label="Project BOM controls"><label for="bomSoltrkVersion"><span>SOLTRK Version</span><select id="bomSoltrkVersion">${['2.0','3.0'].map(value=>`<option value="${value}" ${value===version?'selected':''}>SOLTRK ${value}</option>`).join('')}</select></label><label class="bom-check" for="bomContingencyEnabled"><span>Contingency</span><span class="bom-check-control"><input id="bomContingencyEnabled" type="checkbox" ${project.contingency_enabled?'checked':''}><span>Fasteners</span></span></label><label for="bomContingencyPercent"><span>Fasteners (%)</span><input id="bomContingencyPercent" type="number" min="0" max="100" step="0.1" value="${escapeHtml(E.niceNumber(contingencyPercent))}" ${project.contingency_enabled?'':'disabled'}></label><label class="bom-check" for="bomMetadataEnabled"><span>Material / Weight</span><span class="bom-check-control"><input id="bomMetadataEnabled" type="checkbox" ${project.bom_metadata_enabled!==false?'checked':''}><span>Show columns</span></span></label><label for="bomSoltrkOverride"><span>SOLTRK Override</span><input id="bomSoltrkOverride" type="number" min="0" step="1" placeholder="Auto (${escapeHtml(allocation.automaticSoltrk)})" value="${escapeHtml(overrides.soltrk??'')}"></label><label for="bomJunctionBoxOverride"><span>Junction Box Override</span><input id="bomJunctionBoxOverride" type="number" min="0" step="1" placeholder="Auto (${escapeHtml(allocation.automaticJunctionBox)})" value="${escapeHtml(overrides.junction_box??'')}"></label></div><p class="bom-control-note">Blank overrides use automatic per-configuration quantities. Fastener contingency changes final totals only.</p>`;
+  const plantControls=E.PLANT_ELECTRICAL_ITEMS.map(item=>{
+    const tag=item.key==='anemometer'?E.getAnemometerSelection(project).tag:item.tag;
+    return `<label for="bomPlant_${item.key}"><span>${escapeHtml(item.label)} (${escapeHtml(tag)})</span><small>1 per ${item.perTrackers} trackers</small><input id="bomPlant_${item.key}" type="number" min="0" step="1" placeholder="Auto (${escapeHtml(allocation.plantAutomaticByKey[item.key])})" value="${escapeHtml(overrides[item.key]??'')}"></label>`;
+  }).join('');
+  return `<div class="bom-controls" aria-label="Project BOM controls"><label for="bomSoltrkVersion"><span>SOLTRK Version</span><select id="bomSoltrkVersion">${['2.0','3.0'].map(value=>`<option value="${value}" ${value===version?'selected':''}>SOLTRK ${value}</option>`).join('')}</select></label><label class="bom-check" for="bomContingencyEnabled"><span>Contingency</span><span class="bom-check-control"><input id="bomContingencyEnabled" type="checkbox" ${project.contingency_enabled?'checked':''}><span>Fasteners</span></span></label><label for="bomContingencyPercent"><span>Fasteners (%)</span><input id="bomContingencyPercent" type="number" min="0" max="100" step="0.1" value="${escapeHtml(E.niceNumber(contingencyPercent))}" ${project.contingency_enabled?'':'disabled'}></label><label class="bom-check" for="bomMetadataEnabled"><span>Material / Weight</span><span class="bom-check-control"><input id="bomMetadataEnabled" type="checkbox" ${project.bom_metadata_enabled!==false?'checked':''}><span>Show columns</span></span></label><label for="bomSoltrkOverride"><span>SOLTRK Override</span><input id="bomSoltrkOverride" type="number" min="0" step="1" placeholder="Auto (${escapeHtml(allocation.automaticSoltrk)})" value="${escapeHtml(overrides.soltrk??'')}"></label><label for="bomJunctionBoxOverride"><span>Junction Box Override</span><input id="bomJunctionBoxOverride" type="number" min="0" step="1" placeholder="Auto (${escapeHtml(allocation.automaticJunctionBox)})" value="${escapeHtml(overrides.junction_box??'')}"></label></div><div class="bom-controls bom-plant-controls" aria-label="Plant electrical quantities"><h3>Plant Electrical Quantities</h3>${plantControls}</div><p class="bom-control-note">Blank fields use automatic quantities. Plant electrical totals are rounded once across all trackers; zero is allowed. Fastener contingency changes final totals only.</p>`;
 }
 function bindBomProjectControls(project){
   document.getElementById('bomContingencyEnabled').addEventListener('change',event=>{project.contingency_enabled=event.target.checked;markDirty();refreshOutputsOnly();});
@@ -786,6 +790,7 @@ function bindBomProjectControls(project){
   const bindOverride=(elementId,key,label)=>document.getElementById(elementId).addEventListener('change',event=>{const raw=event.target.value.trim();project.equipment_quantity_overrides=project.equipment_quantity_overrides||{};if(raw===''){delete project.equipment_quantity_overrides[key];markDirty();refreshOutputsOnly();return;}const value=Number(raw);if(!Number.isInteger(value)||value<0){showToast(`${label} override must be blank or a non-negative whole number.`);event.target.value=project.equipment_quantity_overrides[key]??'';return;}project.equipment_quantity_overrides[key]=value;markDirty();refreshOutputsOnly();});
   bindOverride('bomSoltrkOverride','soltrk','SOLTRK');
   bindOverride('bomJunctionBoxOverride','junction_box','Junction Box');
+  for(const item of E.PLANT_ELECTRICAL_ITEMS)bindOverride(`bomPlant_${item.key}`,item.key,item.label);
 }
 function renderBom(){
   const root=document.getElementById('tabBom'),p=getActiveProject();const filtered=current.bom.rows.filter(r=>rowMatchesSearch(r,uiState.projectBomSearch));
@@ -1410,13 +1415,14 @@ function analysisFindPackagePart(item){
 }
 function buildFastenerPackagingData(){
   const active=current?.active||[],totalTrackers=active.reduce((sum,row)=>sum+E.asInt(row['Number of Trackers']),0),bearingPackages=active.reduce((sum,row)=>sum+E.asInt(row['Bearing Posts / Tracker'])*E.asInt(row['Number of Trackers']),0),hatRailPackages=active.reduce((sum,row)=>sum+Math.max(E.asInt(row['PV Modules per Tracker'])-2,0)*E.asInt(row['Number of Trackers']),0),zRailPackages=4*totalTrackers;
+  const tubeConnectionPackages=active.reduce((sum,row)=>sum+E.torqueTubeJointCountForRow(row)*E.asInt(row['Number of Trackers']),0);
   const definitions=[
     {title:'Slew Drive Seat to Drive Pile',basis:'One package per tracker',packages:totalTrackers,items:[['k001164',8],['k001010',8],['k001154',16],['k001163',8]]},
     {title:'Slew Drive to Slew Drive Seat',basis:'One package per tracker',packages:totalTrackers,items:[['k001231',4],['k001228',4],['k001238',4],['k001230',4],[null,2,'din7967m18','DIN 7967 - M18'],[null,2,'din936iso4035m18','DIN 936 ISO 4035 - M18'],['k001239',4]]},
     {title:'Bearing Adapter to Bearing Pile',basis:'One package per bearing adapter',packages:bearingPackages,items:[['k001125',4],['k001124',4],['k001130',4],['k001123',4]]},
     {title:'Bearing to Bearing Adapter',basis:'One package per bearing',packages:bearingPackages,items:[['k001129',2],['k001137',2]]},
     {title:'Torque Tube to Slew Drive',basis:'One package per tracker',packages:totalTrackers,items:[['k001385',16],['k001127',22],['k001166',16]]},
-    {title:'Torque Tube to Torque Tube',basis:'One package per tracker',packages:totalTrackers,items:[['k001388',16],['k001157',32],['k001013',16],['k001479',32]]},
+    {title:'Torque Tube / Slew Drive Connections',basis:'One package per active tube joint',packages:tubeConnectionPackages,items:[['k001388',4],['k001157',8],['k001013',4],['k001479',8]]},
     {title:'Hat Rail to Torque Tube',basis:'One package per Hat rail',packages:hatRailPackages,items:[['k001576',2],['k001575',2],['k001074',2]]},
     {title:'Z Rail to Torque Tube',basis:'One package per Z rail',packages:zRailPackages,items:[['k001151',2],['k001235',2],['k001074',2]]},
   ];
@@ -1480,10 +1486,16 @@ function buildProjectExport(p){
   const arrays=[arrayColumns,...calc.active.map(row=>SELECTED_ARRAY_COLUMNS.map(column=>displayExportCell(row[column]??'')))];
   const bomColumns=calc.bom.columns.filter(column=>!['note','notes','calculationnote'].includes(E.normalizeText(column)));
   const bom=[bomColumns.map(displayExportCell),...calc.bom.rows.map(row=>bomColumns.map(column=>displayExportCell(row[column]??'')))];
+  const bomRowStyles=[null,...calc.bom.rows.map(row=>{
+    const category=String(row.Category??'').trim().toLowerCase();
+    if(category.startsWith('steel structure'))return 'steelStructure';
+    if(category.startsWith('fastener'))return 'fasteners';
+    return null;
+  })];
   const foundationRows=[['Foundation Method',p.inputs.foundation_method],['Drive Pile Depth (mm)',p.inputs.drive_pile_depth_mm],['Drive Pile Type',p.inputs.main_post_profile],['Bearing Pile Depth (mm)',p.inputs.bearing_pile_depth_mm],['Bearing Pile Type',p.inputs.bearing_post_profile]];
   const summaryRows=[...projectSummaryRows(p,calc),...foundationRows];
   const inputRows=[...inputExportRows(p),...foundationRows].map(row=>row.map(displayExportCell));
-  const sheets=[{name:'Project Summary',rows:summaryRows},{name:'Inputs',rows:inputRows},{name:'Custom Bearing Rules',rows:customBearingExportRows(p,calc)},{name:'Selected Arrays',rows:arrays},{name:'Project BOM',rows:bom}];
+  const sheets=[{name:'Project Summary',rows:summaryRows},{name:'Inputs',rows:inputRows},{name:'Custom Bearing Rules',rows:customBearingExportRows(p,calc)},{name:'Selected Arrays',rows:arrays},{name:'Project BOM',rows:bom,rowStyles:bomRowStyles,borderEveryCell:true}];
   return {blob:XlsxLite.createWorkbookBlob(sheets),filename:`${safeFilename(p.project_code)}_${safeFilename(p.project_name)}_LUMA_Complete_BOM.xlsx`};
 }
 async function exportProject(p,directoryHandle=null){

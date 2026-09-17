@@ -45,7 +45,6 @@
   // Compatibility while the category-correction migration is pending in an
   // environment. The same values are stored authoritatively by the migration.
   const CATEGORY_OVERRIDES_BY_TAG = Object.freeze({
-    k001479: 'substructure',
     k001576: 'substructure',
   });
 

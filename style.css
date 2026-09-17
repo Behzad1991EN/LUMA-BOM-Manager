@@ -2263,6 +2263,19 @@ th.wrap {
     font-weight: 800;
 }
 
+.bom-plant-controls h3 {
+    flex-basis: 100%;
+    grid-column: 1 / -1;
+    margin: 0;
+    color: var(--accent-dark);
+    font-size: 14px;
+}
+
+.bom-plant-controls small {
+    font-size: 11px;
+    font-weight: 500;
+}
+
 .bom-controls select,
 .bom-controls input[type="number"] {
     width: 100%;
