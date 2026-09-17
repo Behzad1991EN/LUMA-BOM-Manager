@@ -1,0 +1,11 @@
+{
+  "scripts": {
+    "test": "node --test \"tests/*.test.js\"",
+    "test:auth": "node --test tests/auth-authorization.test.js",
+    "test:suppliers": "node --test tests/supplier-service.test.js",
+    "test:prices": "node --test tests/price-list-service.test.js"
+  },
+  "devDependencies": {
+    "supabase": "^2.116.0"
+  }
+}

@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="../">
+  <title>Quotation renderer UI smoke test</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main id="quotationRoot"></main>
+  <p id="smokeResult" hidden>running</p>
+  <script src="currency-data.js"></script>
+  <script>
+    const quotation = {customer_company:'Energy & Solar S.r.l.', project_location:'Milan', quotation_number:'Q-20020'};
+    const project = {project_id:'smoke-project', project_code:'SMOKE', project_name:'Smoke Test', quotation};
+    window.LumaApp = {
+      getActiveProject:()=>project, getCalculation:()=>({}), getCommercialSummary:()=>({}), markProjectDirty:()=>{},
+    };
+    window.LumaQuotationModel = {
+      normalize:value=>value,
+      fromApplication:()=>({clientCompany:quotation.customer_company, projectLocation:quotation.project_location, quotationNumber:quotation.quotation_number, projectCode:project.project_code}),
+      buildQuotationModel:()=>({}), loadSettings:async()=>({}),
+    };
+    window.LumaQuotationLatex = {buildVariables:()=>'',buildLayout:value=>value,overflowWarnings:()=>[]};
+    window.LumaQuotationFields = {
+      primaryControls:()=>[{label:'Client Company',key:'customer_company',inputType:'text'},{label:'Project Location',key:'project_location',inputType:'text',maxLength:30},{label:'Quotation Number',key:'quotation_number',inputType:'text'}],
+      draftGroups:()=>new Map(),
+    };
+    window.LumaQuotationCompiler = {
+      compileQuotation:async(_files, _main, {onStatus})=>{
+        const stages=[['loading-engine',8],['engine-ready',20],['loading-format',28],['compiling-pass-1',45],['compiling-pass-2',67],['converting-pdf',86],['finalizing',96]];
+        window.smokePhases=[];
+        for(const [phase,progress] of stages){ onStatus(phase,{progress}); window.smokePhases.push({phase,progress}); await new Promise(resolve=>setTimeout(resolve,450)); }
+        return {blob:new Blob(['%PDF-1.4\n% quotation renderer UI smoke test\n'], {type:'application/pdf'}),log:'UI smoke test',compiler:'smoke'};
+      },
+    };
+    window.LumaSupabase = {getClient:()=>({from:()=>({insert:async()=>({error:null})})})};
+    window.showSaveFilePicker = async()=>({createWritable:async()=>({
+      write:async blob=>{ window.savedPdfBytes=blob.size; },
+      close:async()=>{ window.savedPdfClosed=true; },
+    })});
+  </script>
+  <script src="quotation-renderer.js"></script>
+  <script>
+    (async()=>{
+      const root=document.getElementById('quotationRoot');
+      await window.LumaQuotation.render(root);
+      const locationInput=root.querySelector('[data-quotation-field="project_location"]');
+      if(locationInput.maxLength!==30||locationInput.closest('label').querySelector('[data-quotation-character-limit]'))throw new Error('Project Location limit is incorrect.');
+      root.querySelector('[data-quotation-action="refresh"]').click();
+      const waitFor=predicate=>new Promise((resolve,reject)=>{const started=Date.now(),timer=setInterval(()=>{if(predicate()){clearInterval(timer);resolve();}else if(Date.now()-started>10000){clearInterval(timer);reject(new Error('UI smoke test timed out.'));}},50);});
+      await waitFor(()=>root.querySelector('[data-quotation-status]').textContent==='Quotation generated successfully.');
+      root.querySelector('[data-quotation-action="download"]').click();
+      await waitFor(()=>window.savedPdfClosed===true);
+      document.getElementById('smokeResult').textContent=`success:${window.savedPdfBytes}`;
+      document.title='Quotation renderer UI smoke test passed';
+    })().catch(error=>{document.getElementById('smokeResult').textContent=`failure:${error.message}`;document.title='Quotation renderer UI smoke test failed';});
+  </script>
+</body>
+</html>

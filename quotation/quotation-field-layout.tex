@@ -1,0 +1,35 @@
+% Stable print-positioning primitives for registry-generated quotation fields.
+% All coordinates are millimetres from the A4 page's top-left corner.
+% Text Y coordinates are baselines and every text node uses a baseline anchor.
+\definecolor{QuotationWhite}{HTML}{FFFFFF}
+\definecolor{QuotationPeach}{HTML}{FDE9D9}
+
+\newif\ifQuotationLayoutDebug
+\QuotationLayoutDebugfalse
+\providecommand{\QuotationPageOneOverlay}{}
+\providecommand{\QuotationPageFourOverlay}{}
+\providecommand{\QuotationPageFiveOverlay}{}
+\providecommand{\QuotationPageSixOverlay}{}
+\providecommand{\QuotationPageElevenOverlay}{}
+
+\newcommand{\QErase}[5]{%
+  \fill[fill=#5,draw=none]
+    ([xshift=#1mm,yshift=-#2mm]current page.north west) rectangle ++(#3mm,-#4mm);%
+  \ifQuotationLayoutDebug
+    \draw[magenta,line width=0.15mm]
+      ([xshift=#1mm,yshift=-#2mm]current page.north west) rectangle ++(#3mm,-#4mm);%
+  \fi
+}
+
+% anchor, field ID, x, baseline y, safe width, normal size, minimum size, HTML color, content
+\newcommand{\QText}[9]{%
+  \node[anchor=#1,inner sep=0pt,outer sep=0pt]
+    at ([xshift=#3mm,yshift=-#4mm]current page.north west)
+    {\fontsize{#6}{#6}\selectfont\color[HTML]{#8}#9};%
+  \ifQuotationLayoutDebug
+    \draw[cyan,line width=0.12mm]
+      ([xshift=#3mm,yshift=-#4mm]current page.north west) -- ++(#5mm,0);
+    \node[anchor=south west,inner sep=0.3mm,text=magenta]
+      at ([xshift=#3mm,yshift=-#4mm]current page.north west) {\tiny #2};
+  \fi
+}

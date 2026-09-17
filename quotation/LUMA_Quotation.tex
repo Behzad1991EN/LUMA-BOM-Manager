@@ -1,0 +1,28 @@
+% !TeX program = xelatex
+% Authoritative LUMA quotation: approved PDF background plus dynamic overlays.
+% Compile twice so TikZ remember-picture coordinates are finalized.
+\documentclass[a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[sfdefault]{carlito}
+\usepackage[none]{hyphenat}
+\usepackage{xcolor}
+\usepackage{tikz}
+\usepackage{pdfpages}
+\pagestyle{empty}
+\hyphenpenalty=10000
+\exhyphenpenalty=10000
+\emergencystretch=3em
+
+\input{quotation_variables.tex}
+\input{quotation-field-layout.tex}
+
+\begin{document}
+\includepdf[pages=1,fitpaper=true,pagecommand={\QuotationPageOneOverlay}]{assets/LUMA_ENG_static.pdf}
+\includepdf[pages=2-3,fitpaper=true,pagecommand={}]{assets/LUMA_ENG_static.pdf}
+\includepdf[pages=4,fitpaper=true,pagecommand={\QuotationPageFourOverlay}]{assets/LUMA_ENG_static.pdf}
+\includepdf[pages=5,fitpaper=true,pagecommand={\QuotationPageFiveOverlay}]{assets/LUMA_ENG_static.pdf}
+\includepdf[pages=6,fitpaper=true,pagecommand={\QuotationPageSixOverlay}]{assets/LUMA_ENG_static.pdf}
+\includepdf[pages=7-10,fitpaper=true,pagecommand={}]{assets/LUMA_ENG_static.pdf}
+\includepdf[pages=11,fitpaper=true,pagecommand={\QuotationPageElevenOverlay}]{assets/LUMA_ENG_static.pdf}
+\end{document}

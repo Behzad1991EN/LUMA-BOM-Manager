@@ -1,0 +1,73 @@
+% Default quotation parameters for standalone LaTeX editing.
+% LUMA BOM Manager replaces this file in memory when generating a quotation.
+% Keep command names stable: they are the interface between the app and TeX.
+\newcommand{\QFClientCompany}{NAME COMPANY/CLIENT}
+\newcommand{\QFProjectLocation}{Location}
+\newcommand{\QFClientTitle}{MR/MRs}
+\newcommand{\QFClientFirstName}{XXXXX}
+\newcommand{\QFClientLastName}{XXXXXX}
+\newcommand{\QFClientAddress}{Address}
+\newcommand{\QFClientPostalCode}{Postal code}
+\newcommand{\QFClientCity}{City}
+\newcommand{\QFClientCountry}{Country}
+\newcommand{\QFQuotationNumber}{XXXX-XXXX}
+\newcommand{\QFQuotationDateDay}{XX}
+\newcommand{\QFQuotationDateMonth}{XX}
+\newcommand{\QFTrackerOfferQuantity}{kWp}
+\newcommand{\QFTrackerPricePerKwWhole}{XXX}
+\newcommand{\QFPanelsPerStructure}{XX}
+\newcommand{\QFStructureCount}{XX}
+\newcommand{\QFPileCount}{XXXX}
+\newcommand{\QFModuleCount}{XXXX}
+\newcommand{\QFModuleWidthMm}{XXXX}
+\newcommand{\QFModuleLengthMm}{XXXX}
+\newcommand{\QFModulePowerWp}{XXX}
+\newcommand{\QFTrackerLengthM}{XX}
+\newcommand{\QFTrackerHeightM}{1,50}
+\newcommand{\QFFoundationDepthM}{1,50}
+\newcommand{\QFMaximumTrackingTilt}{60°}
+\newcommand{\QFGroundClearanceM}{0,50}
+\newcommand{\QFPitchDistance}{XX,XX}
+\newcommand{\QFSafeguardQuantity}{X}
+\newcommand{\QFMonitoringQuantity}{X}
+\newcommand{\QFCommissioningPriceWhole}{XXXX}
+\newcommand{\QFFootnoteDesignCode}{Eurocode 1991}
+\newcommand{\QFFootnoteWindLoad}{250N/m²}
+\newcommand{\QFCommissioningWorkingDays}{XX}
+\newcommand{\QFPilePricePerMWpWhole}{550}
+\newcommand{\QFInstallationManworkRateWhole}{500}
+\newcommand{\QFExtendedManworkRateWhole}{600}
+\newcommand{\QFGeneralLayoutReference}{XXXXXXX}
+
+% Composed and calculated application parameters.
+\newcommand{\QFProjectMWp}{XXXX}
+\newcommand{\QFClientName}{XXXXX XXXXXX}
+\newcommand{\QFClientPostalCity}{Postal code - City}
+\newcommand{\QFQuotationVersion}{ksi1.0}
+\newcommand{\QFQuotationDate}{XX/XX/2026}
+\newcommand{\QFQuotationDateYear}{2026}
+\newcommand{\QFCurrencyCode}{EUR}
+\newcommand{\QFCurrencySymbol}{€}
+\newcommand{\QFTrackerPricePerKw}{XXX,00}
+\newcommand{\QFTrackerOfferTotal}{0,00}
+\newcommand{\QFSafeguardUnitPrice}{2.500,00}
+\newcommand{\QFSafeguardTotal}{0,00}
+\newcommand{\QFMonitoringUnitPrice}{1.800,00}
+\newcommand{\QFMonitoringTotal}{0,00}
+\newcommand{\QFEngineeringUnitPrice}{3.500,00}
+\newcommand{\QFEngineeringTotal}{3.500,00}
+\newcommand{\QFCommissioningPrice}{XXXX,00}
+\newcommand{\QFCommissioningTotal}{0,00}
+\newcommand{\QFQuotationTotal}{0,00}
+\newcommand{\QFPilePricePerMWp}{550,00}
+\newcommand{\QFInstallationManworkRate}{500,00}
+\newcommand{\QFExtendedManworkRate}{600,00}
+
+% Dynamic project-configuration layout. The application emits one
+% \PlaceConfigurationLine call for every distinct array panel count.
+\newcommand{\QFConfigurationLineStep}{13.830}
+\newcommand{\QFConfigurationFontSize}{10.560}
+\newcommand{\QFConfigurationDetailStartY}{234.650}
+\newcommand{\QFStructureConfigurationRows}{%
+  \PlaceConfigurationLine{220.820}{N. of structures with \QFPanelsPerStructure{} panels: \QFStructureCount}%
+}

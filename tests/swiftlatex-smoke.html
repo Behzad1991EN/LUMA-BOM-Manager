@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>SwiftLaTeX smoke test pending</title>
+</head>
+<body>
+  <main>
+    <h1>SwiftLaTeX quotation smoke test</h1>
+    <p id="status">Preparing test...</p>
+    <p id="phases"></p>
+  </main>
+  <script src="../currency-data.js"></script>
+  <script src="../quotation-field-definitions.js"></script>
+  <script src="../quotation-latex.js"></script>
+  <script src="../quotation/compilers/quotation-compiler.js"></script>
+  <script src="../quotation/compilers/swiftlatex-compiler.js"></script>
+  <script type="module">
+      const status = document.getElementById('status');
+      const phases = [];
+      window.smokePhases = phases;
+      const load = async (url, binary = false) => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`${url}: ${response.status}`);
+        return binary ? new Uint8Array(await response.arrayBuffer()) : response.text();
+      };
+      try {
+        const assets = [
+          ['Picture/image4.png','../LaTeX/Picture/image4.png'],
+          ['Picture/image7.png','../LaTeX/Picture/image7.png'],
+          ['Picture/image8.png','../LaTeX/Picture/image8.png'],
+          ['Original/source_media/image1.jpg','../LaTeX/Original/source_media/image1.jpg'],
+          ['Original/source_media/image2.png','../LaTeX/Original/source_media/image2.png'],
+          ['Original/source_media/image3.jpeg','../LaTeX/Original/source_media/image3.jpeg'],
+          ['Original/source_media/image5.png','../LaTeX/Original/source_media/image5.png'],
+          ['Original/source_media/image6.png','../LaTeX/Original/source_media/image6.png'],
+        ];
+        const [master, ...assetBytes] = await Promise.all([
+          load('../LaTeX/LUMA%20Quotation-3-revised.tex'),
+          ...assets.map(([,url]) => load(url, true)),
+        ]);
+        const fields = Object.fromEntries(window.LumaQuotationFields.FIELDS.map(definition => [definition.id, definition.exampleValue]));
+        Object.assign(fields, {clientCompany:'Energy & Solar S.r.l.', projectLocation:'Milan', quotationNumber:'Q-20020'});
+        const variables = window.LumaQuotationLatex.buildVariables({fields,projectMWp:1.5,quotationVersion:'01',quotationDate:'2026-09-07',quotationCurrency:'EUR',pricePerKw:120,trackerOfferTotal:180000,quotationTotal:190000});
+        const files = new Map([
+          ['LUMA_Quotation.tex', master],
+          ['quotation_variables.tex', variables],
+        ]);
+        assets.forEach(([target], index) => files.set(target, assetBytes[index]));
+        const result = await window.LumaQuotationCompiler.compileQuotation(files, 'LUMA_Quotation.tex', {
+          onStatus: (phase, detail = {}) => {
+            phases.push({phase, progress:detail.progress ?? null});
+            status.textContent = `${phase}:${detail.progress ?? ''}`;
+            document.getElementById('phases').textContent = phases.map(item => `${item.phase} (${item.progress}%)`).join(' -> ');
+          },
+        });
+        const bytes = new Uint8Array(await result.blob.arrayBuffer());
+        if (bytes.length < 2000000 || String.fromCharCode(...bytes.slice(0, 5)) !== '%PDF-') throw new Error('Compiler output is not the expected PDF.');
+        const objectUrl = URL.createObjectURL(result.blob);
+        const download = document.createElement('a');
+        download.id = 'download';
+        download.href = objectUrl;
+        download.download = 'swiftlatex-smoke.pdf';
+        download.textContent = 'Download generated smoke-test PDF';
+        document.querySelector('main').appendChild(download);
+        const preview = document.createElement('iframe');
+        preview.id = 'preview';
+        preview.src = objectUrl;
+        preview.title = 'Generated SwiftLaTeX smoke-test PDF';
+        document.body.appendChild(preview);
+        status.textContent = `success:${bytes.length}:${result.compiler}`;
+        status.dataset.result = 'success';
+        document.title = 'SwiftLaTeX smoke test passed';
+      } catch (error) {
+        status.textContent = `failure:${error.code || 'UNKNOWN'}:${error.message}`;
+        status.dataset.result = 'failure';
+        const log = document.createElement('pre');
+        log.id = 'log';
+        log.textContent = error.log || '';
+        document.body.appendChild(log);
+        document.title = 'SwiftLaTeX smoke test failed';
+      }
+  </script>
+</body>
+</html>

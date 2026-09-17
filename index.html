@@ -5,13 +5,128 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="color-scheme" content="light" />
   <title>LUMA BOM Manager</title>
-  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="style.css?v=20260917-v4" />
 </head>
 <body>
+  <section id="authRoot" class="auth-root" aria-labelledby="loginTitle">
+    <div class="login-card">
+      <img src="KSI-Logo.png" alt="KSI" class="login-logo" />
+      <div id="authLoginHeading" class="login-heading">
+        <p>LUMA single-axis tracker</p>
+        <h1 id="loginTitle">LUMA BOM Manager</h1>
+        <span>Sign in with your authorized account to continue.</span>
+      </div>
+      <div id="authLoading" class="auth-loading" role="status">Checking your session...</div>
+      <form id="loginForm" class="login-form" hidden>
+        <label for="loginEmail">Email</label>
+        <input id="loginEmail" name="email" type="email" autocomplete="username" required />
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" name="password" type="password" autocomplete="current-password" required />
+        <div id="loginCaptcha" class="captcha-container" aria-label="hCaptcha security verification"></div>
+        <button id="loginSubmitBtn" type="submit">Sign In</button>
+        <button id="forgotPasswordBtn" class="auth-link-button" type="button">Forgot password?</button>
+        <p id="loginStatus" class="login-status" role="alert" aria-live="polite" hidden></p>
+      </form>
+      <form id="accountSetupForm" class="login-form account-setup-form" aria-labelledby="accountSetupTitle" hidden>
+        <div class="account-setup-heading">
+          <h2 id="accountSetupTitle">Complete Your Account</h2>
+          <p>Create a password for <strong id="accountSetupEmail"></strong>.</p>
+        </div>
+        <label for="newPassword">New Password</label>
+        <input id="newPassword" name="new-password" type="password" autocomplete="new-password" minlength="8" required />
+        <div class="password-requirements" data-password-requirements="newPassword" aria-live="polite">
+          <span>Password must contain:</span>
+          <ul>
+            <li data-password-rule="length">At least 8 characters</li>
+            <li data-password-rule="uppercase">One uppercase letter</li>
+            <li data-password-rule="lowercase">One lowercase letter</li>
+            <li data-password-rule="digit">One number</li>
+          </ul>
+        </div>
+        <label for="confirmPassword">Confirm Password</label>
+        <input id="confirmPassword" name="confirm-password" type="password" autocomplete="new-password" minlength="8" required />
+        <aside class="password-security-notice" aria-label="Password security notice">
+          <strong>Do Not Use KSI account password</strong>
+          <span>Use at least 8 characters</span>
+          <span>Use numbers + upper and Lower case letters</span>
+        </aside>
+        <button id="setPasswordBtn" type="submit">Set Password</button>
+        <p id="accountSetupStatus" class="login-status" role="alert" aria-live="polite" hidden></p>
+      </form>
+      <form id="forgotPasswordForm" class="login-form account-setup-form" aria-labelledby="forgotPasswordTitle" hidden>
+        <div class="account-setup-heading">
+          <h2 id="forgotPasswordTitle">Reset Your Password</h2>
+          <p>Enter your account email. We will send password-reset instructions if the account is eligible.</p>
+        </div>
+        <label for="forgotPasswordEmail">Email</label>
+        <input id="forgotPasswordEmail" name="reset-email" type="email" autocomplete="email" required />
+        <div id="forgotCaptcha" class="captcha-container" aria-label="hCaptcha security verification"></div>
+        <button id="forgotPasswordSubmitBtn" type="submit" disabled>Send Reset Link</button>
+        <button id="forgotPasswordBackBtn" class="auth-link-button" type="button">Back to Sign In</button>
+        <p id="forgotPasswordStatus" class="login-status" role="alert" aria-live="polite" hidden></p>
+      </form>
+      <section id="recoveryConfirmationPanel" class="account-setup-heading auth-error-panel recovery-confirmation-panel" aria-labelledby="recoveryConfirmationTitle" hidden>
+        <h2 id="recoveryConfirmationTitle">Confirm Password Change</h2>
+        <p>To protect this link from automatic email scanners, continue only if you requested this password change.</p>
+        <button id="recoveryConfirmationContinueBtn" type="button">Continue Password Change</button>
+        <button id="recoveryConfirmationBackBtn" class="auth-link-button" type="button">Back to Sign In</button>
+        <p id="recoveryConfirmationStatus" class="login-status" role="alert" aria-live="polite" hidden></p>
+      </section>
+      <form id="recoveryPasswordForm" class="login-form account-setup-form" aria-labelledby="recoveryPasswordTitle" hidden>
+        <div class="account-setup-heading">
+          <h2 id="recoveryPasswordTitle">Set New Password</h2>
+          <p>Choose a new password for <strong id="recoveryPasswordEmail"></strong>.</p>
+        </div>
+        <label for="recoveryNewPassword">New Password</label>
+        <input id="recoveryNewPassword" name="recovery-new-password" type="password" autocomplete="new-password" minlength="8" required />
+        <div class="password-requirements" data-password-requirements="recoveryNewPassword" aria-live="polite">
+          <span>Password must contain:</span>
+          <ul>
+            <li data-password-rule="length">At least 8 characters</li>
+            <li data-password-rule="uppercase">One uppercase letter</li>
+            <li data-password-rule="lowercase">One lowercase letter</li>
+            <li data-password-rule="digit">One number</li>
+          </ul>
+        </div>
+        <label for="recoveryConfirmPassword">Confirm New Password</label>
+        <input id="recoveryConfirmPassword" name="recovery-confirm-password" type="password" autocomplete="new-password" minlength="8" required />
+        <aside class="password-security-notice" aria-label="Password security notice">
+          <strong>Do Not Use KSI account password</strong>
+          <span>Use at least 8 characters</span>
+          <span>Use numbers + upper and Lower case letters</span>
+        </aside>
+        <button id="recoveryPasswordSubmitBtn" type="submit">Set New Password</button>
+        <p id="recoveryPasswordStatus" class="login-status" role="alert" aria-live="polite" hidden></p>
+      </form>
+      <section id="invalidRecoveryPanel" class="account-setup-heading auth-error-panel" aria-labelledby="invalidRecoveryTitle" hidden>
+        <h2 id="invalidRecoveryTitle">Reset Link Unavailable</h2>
+        <p id="invalidRecoveryMessage">This password link is invalid or has expired. Request a new password link.</p>
+        <button id="invalidRecoveryRequestBtn" type="button">Request New Reset Link</button>
+        <button id="invalidRecoveryBackBtn" class="auth-link-button" type="button">Back to Sign In</button>
+      </section>
+    </div>
+  </section>
+
+  <div id="appShell" hidden>
   <div id="sidebarScrim" class="sidebar-scrim" hidden></div>
   <aside id="appSidebar" class="sidebar" aria-label="Workspace and project menu">
     <div class="sidebar-mobile-header"><strong>Menu</strong><button id="mobileMenuCloseBtn" class="mobile-menu-close" type="button" aria-label="Close menu">&times;</button></div>
-    <h1>Sidebar</h1>
+
+    <section class="sidebar-account-section" aria-label="Signed-in account">
+      <div class="auth-session account-menu-wrap">
+        <button id="accountMenuBtn" class="account-menu-button" type="button" aria-haspopup="menu" aria-expanded="false">
+          <span class="account-avatar" aria-hidden="true">●</span>
+          <span id="authenticatedUserName" class="account-menu-name"></span>
+          <span class="account-menu-caret" aria-hidden="true">▾</span>
+        </button>
+        <div id="accountMenu" class="account-menu" role="menu" hidden>
+          <span id="authenticatedUserEmail" class="account-menu-email"></span>
+          <button id="myProfileBtn" type="button" role="menuitem">My Profile</button>
+          <button id="changePasswordBtn" type="button" role="menuitem">Change Password</button>
+          <button id="logoutBtn" type="button" role="menuitem">Sign Out</button>
+        </div>
+      </div>
+    </section>
 
     <section class="sidebar-section">
       <div class="workspace-heading"><h2>WORKSPACE</h2><strong id="workspaceName" title="Sample">Sample</strong></div>
@@ -57,7 +172,7 @@
         <button id="exportActiveBtn" class="export">Active Project</button><button id="exportAllBtn" class="export">All Projects</button>
         <button id="changelogBtn">Changelog</button><button id="readmeBtn">Read Me</button>
       </div>
-      <div class="version">Version 3.43 · 25.08.2026<br/>By Behzad Eydiyoon</div>
+      <div class="version">Version 4.00 · 17.09.2026<br/>By Behzad Eydiyoon</div>
     </section>
   </aside>
 
@@ -69,10 +184,13 @@
         <p>Use Inputs → Array Table → review selected arrays, BOM, support plates and tracker sketch.</p>
         <strong id="currentProjectHeader">Current Project: SAMPLE — Sample Project</strong>
       </div>
-      <img src="KSI-Logo.png" alt="KSI" class="logo" />
+      <div class="app-header-actions">
+        <img src="KSI-Logo.png" alt="KSI" class="logo" />
+      </div>
     </header>
 
     <nav id="tabs" class="tabs" aria-label="Application tabs"></nav>
+    <div id="partMasterStatus" class="part-master-status" role="status" aria-live="polite" hidden></div>
     <div class="notebook-body">
       <section id="tabInputs" class="tab-page"></section>
       <section id="tabArray" class="tab-page"></section>
@@ -80,9 +198,10 @@
       <section id="tabBearing" class="tab-page"></section>
       <section id="tabSupport" class="tab-page"></section>
       <section id="tabBom" class="tab-page"></section>
-      <section id="tabPartMaster" class="tab-page"></section>
       <section id="tabSketch" class="tab-page"></section>
       <section id="tabAnalysis" class="tab-page"></section>
+      <section id="tabQuotation" class="tab-page"></section>
+      <section id="tabAdministration" class="tab-page"></section>
       <!-- Calculation Logic tab hidden; Part Master Calculation Note is sufficient for now. -->
     </div>
   </main>
@@ -90,7 +209,6 @@
   <div id="fixedHorizontalScroll" class="fixed-h-scroll" aria-hidden="true"><div id="fixedHorizontalScrollInner"></div></div>
 
   <input id="workspaceFileInput" type="file" accept=".luma,application/json" hidden />
-  <input id="partMasterFileInput" type="file" accept=".json,application/json" hidden />
 
   <div id="modalBackdrop" class="modal-backdrop" hidden>
     <div id="modalBox" class="modal-box" role="dialog" aria-modal="true">
@@ -100,9 +218,81 @@
     </div>
   </div>
 
+  <div id="accountModalBackdrop" class="modal-backdrop account-modal-backdrop" hidden>
+    <div class="modal-box account-modal" role="dialog" aria-modal="true" aria-labelledby="accountModalTitle">
+      <div class="modal-header"><h2 id="accountModalTitle">My Profile</h2><button id="accountModalCloseBtn" class="icon-button" type="button" aria-label="Close">×</button></div>
+      <form id="profileForm" class="account-form">
+        <div class="account-form-grid">
+          <label>Full Name<input id="profileFullName" type="text" autocomplete="name" maxlength="160" /></label>
+          <label>Job Title<input id="profileJobTitle" type="text" autocomplete="organization-title" maxlength="160" /></label>
+          <label>Company<input id="profileCompany" type="text" autocomplete="organization" maxlength="160" /></label>
+          <label>Phone<input id="profilePhone" type="tel" autocomplete="tel" maxlength="80" /></label>
+          <label>Email<input id="profileEmail" type="email" readonly /></label>
+          <label>Role<input id="profileRole" type="text" readonly /></label>
+        </div>
+        <p id="profileStatus" class="login-status" role="alert" aria-live="polite" hidden></p>
+        <div class="modal-actions account-form-actions">
+          <button id="profileChangePasswordBtn" type="button">Change Password</button>
+          <button id="profileSaveBtn" class="export" type="submit">Save Profile</button>
+        </div>
+      </form>
+      <form id="changePasswordForm" class="account-form" hidden>
+        <p class="account-form-help">A confirmation link will be sent to:</p>
+        <label>Account Email<input id="changePasswordEmail" type="email" readonly /></label>
+        <p class="account-form-help">To protect your account, you must open the link in your email before choosing a new password.</p>
+        <div id="changePasswordCaptcha" class="captcha-container" aria-label="hCaptcha security verification"></div>
+        <aside class="password-security-notice" aria-label="Password security notice">
+          <strong>Do Not Use KSI account password</strong>
+          <span>Use at least 8 characters</span>
+          <span>Use numbers + upper and Lower case letters</span>
+        </aside>
+        <p id="changePasswordStatus" class="login-status" role="alert" aria-live="polite" hidden></p>
+        <div class="modal-actions account-form-actions">
+          <button id="changePasswordCancelBtn" type="button">Back to Profile</button>
+          <button id="changePasswordSubmitBtn" class="export" type="submit" disabled>Send Password Change Link</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.112.4"></script>
+  <script src="auth-config.js"></script>
+  <script src="supabase-client.js"></script>
+  <script src="captcha-service.js"></script>
+  <script src="profile-service.js"></script>
+  <script src="currency-data.js"></script>
+  <script src="country-data.js"></script>
+  <script src="logistics-calculator.js"></script>
+  <script src="commercial-cost-calculator.js"></script>
+  <script src="personnel-cost-calculator.js"></script>
+  <script src="result-cost-calculator.js"></script>
+  <script src="overhead-service.js"></script>
+  <script src="personnel-service.js"></script>
+  <script src="logistics-service.js"></script>
+  <script src="part-master-service.js?v=20260917-v4"></script>
+  <script src="supplier-service.js"></script>
+  <script src="price-list-service.js?v=20260917-v4"></script>
+  <script src="commercial-categories.js?v=20260917-v4"></script>
+  <script src="analysis-commercial.js?v=20260917-v4"></script>
+  <script src="post-configuration-service.js?v=20260917-pile-terminology"></script>
+  <script src="quotation-field-definitions.js?v=20260908-location-limit"></script>
+  <script src="quotation-model.js?v=20260917-pile-terminology"></script>
+  <script src="quotation-latex.js?v=20260908-location-limit"></script>
+  <script src="quotation/compilers/quotation-compiler.js"></script>
+  <script src="quotation/compilers/swiftlatex-compiler.js"></script>
+  <script src="quotation-renderer.js?v=20260908-location-limit"></script>
+  <script src="admin-price-lists.js"></script>
+  <script src="admin-part-master.js?v=20260917-pile-terminology"></script>
+  <script src="admin-logistics.js"></script>
+  <script src="admin-overhead.js"></script>
+  <script src="admin-personnel.js"></script>
+  <script src="admin-suppliers.js?v=20260902-administration-home"></script>
   <script src="data.js"></script>
-  <script src="engine.js"></script>
-  <script src="xlsx-lite.js"></script>
-  <script src="app.js"></script>
+  <script src="engine.js?v=20260917-v4"></script>
+  <script src="xlsx-lite.js?v=20260917-v4"></script>
+  <script src="app.js?v=20260917-v4"></script>
+  <script src="auth.js"></script>
+  <script src="https://js.hcaptcha.com/1/api.js?onload=lumaHCaptchaOnload&amp;render=explicit&amp;recaptchacompat=off" async defer onerror="window.lumaHCaptchaScriptError && window.lumaHCaptchaScriptError()"></script>
 </body>
 </html>
