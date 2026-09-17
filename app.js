@@ -2,8 +2,8 @@
 
 const E = LumaEngine;
 const APP_NAME = 'LUMA BOM Manager';
-const APP_VERSION = 'Version 3.43';
-const APP_RELEASE_DATE = '25.08.2026';
+const APP_VERSION = 'Version 4.00';
+const APP_RELEASE_DATE = '17.09.2026';
 const APP_AUTHOR = 'Behzad Eydiyoon';
 const WORKSPACE_FORMAT_VERSION = '1.0';
 const RECOVERY_KEY = 'luma_bom_manager_v3_43_browser_recovery';
@@ -140,9 +140,18 @@ const CHANGELOG = {
   '3.40': ['Added the workspace name display and compact New, Open, Rename, and Save icon toolbar','Replaced Workspace Save As with Rename and made Sample the default workspace name','Added destination selection for workspace, Excel, Part Master, and tracker-sketch saves when supported by the browser','Redesigned Analysis as a home page with six destination pages and icon Back navigation','Added persistent unit-price registers for Electrical, Major Components, and Fasteners','Added eight installation-section fastener packages with quantity per package and required quantity','Added separate persistent Material Mode and Part Mode pricing to Steel Structure Cost','Made the Analysis home and Total Project Cost follow the selected steel pricing mode and report missing steel material or weight data','Added editable Material and Weight columns to Part Master and made them read-only in Project BOM','Changed Part Master Save to one filename-and-location dialog with Active Project Name + Part Master as the default filename','Kept inline table editors active when repositioning the caret with the mouse','Added a responsive phone and tablet layout with a collapsible menu, scrollable tabs, stacked forms, touch-sized controls, mobile dialogs, and local table scrolling','Aligned the PV Module Gap input and lock button with the standard input column','Changed k001539 to Anemometer Bracket × 3'],
   '3.41': ['Added Plant Elevation ASL input in meters with the selected anemometer shown beside it','Automatically selects k001536 at 400 m ASL or higher and k001596 below 400 m ASL','Added the normal-weather anemometer to the Part Master and both anemometer prices in EUR','Added elevation and selected-anemometer information to Excel exports'],
   '3.42': ['Added the supplied EUR unit costs as editable default prices throughout Analysis','Displayed default prices in gray and kept user-entered overrides in the standard text color','Made deleting a user override restore its default price','Mapped the supplied legacy main-post and bearing-post price tags to their current Part Master equivalents'],
-  '3.43': ['Added a toggleable magnifying lens to Tracker Sketch','Added selectable 1.5×, 2×, 2.5×, 3×, 3.5×, and 4× magnification','Kept vector labels and dimensions sharp inside the magnifier']
+  '3.43': ['Added a toggleable magnifying lens to Tracker Sketch','Added selectable 1.5×, 2×, 2.5×, 3×, 3.5×, and 4× magnification','Kept vector labels and dimensions sharp inside the magnifier'],
+  '4.00': [
+    'Added Supabase sign-in, invitation account setup, password recovery and change, session restoration, hCaptcha protection, and user profiles',
+    'Added database-enforced user and admin roles with an Administration area for suppliers, supplier price lists, Part Master, logistics, personnel costs, and overhead',
+    'Expanded Analysis with supplier-based pricing, logistics, personnel and overhead costs, PV module procurement selection, and final pricing with contingency, margin, and VAT',
+    'Connected Quotation fields to the LaTeX template and added PDF generation with progress feedback and save-location selection',
+    'Improved Project BOM controls for SOLTRK versions and editable equipment quantities, including plant-wide electrical quantities and SOLTRK 3.0 plates',
+    'Updated torque-tube joint fastener calculations and Tube Spacer k001479 to 2 × k001388 in the Fasteners category',
+    'Improved Analysis and Part Master tables and added complete cell borders and category-colored rows to the exported Project BOM'
+  ]
 };
-const CHANGELOG_DATES = {'1.00':'26.05.2026','2.00':'08.06.2026','2.10':'16.06.2026','2.20':'17.06.2026','3.00':'08.07.2026','3.10':'22.07.2026','3.11':'27.07.2026','3.20':'18.08.2026','3.30':'19.08.2026','3.40':'20.08.2026','3.41':'24.08.2026','3.42':'25.08.2026','3.43':'25.08.2026'};
+const CHANGELOG_DATES = {'1.00':'26.05.2026','2.00':'08.06.2026','2.10':'16.06.2026','2.20':'17.06.2026','3.00':'08.07.2026','3.10':'22.07.2026','3.11':'27.07.2026','3.20':'18.08.2026','3.30':'19.08.2026','3.40':'20.08.2026','3.41':'24.08.2026','3.42':'25.08.2026','3.43':'25.08.2026','4.00':'17.09.2026'};
 const USER_MANUAL_URL = 'https://ksisolar.sharepoint.com/:b:/s/Engineering/IQA8CGStyAACQ7K8hFJe4jJ6Ad-f3cKvwnyZnM2lhb7yq0I?e=L8zsa5';
 
 let workspace = null;
