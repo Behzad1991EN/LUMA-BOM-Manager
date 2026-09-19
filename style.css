@@ -1900,22 +1900,17 @@ textarea:focus {
     min-width: 0;
 }
 
-.module-rail-compatibility-row {
-    min-height: 0;
-    margin-top: -4px;
-}
-
 .module-rail-compatibility {
-    grid-column: 2;
     display: flex;
-    width: 278px;
+    min-width: 0;
     box-sizing: border-box;
-    flex-direction: column;
-    gap: 2px;
+    align-items: center;
+    gap: 5px;
     padding: 7px 10px;
     border: 1px solid currentColor;
     background: #fff;
     line-height: 1.25;
+    white-space: nowrap;
 }
 
 .module-rail-compatibility strong {
@@ -4275,6 +4270,11 @@ th.wrap {
 
     .anemometer-selection {
         grid-column: 2;
+    }
+
+    .module-rail-compatibility {
+        grid-column: 2;
+        white-space: normal;
     }
 
     .form-row input,

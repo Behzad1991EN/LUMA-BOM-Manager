@@ -18,8 +18,15 @@ function loadEngine(){
 
 test('PV module longitudinal holes are compatible when any entered distance is 400 or 790 mm',()=>{
   const engine=loadEngine();
-  assert.equal(engine.moduleRailCompatibility({inputs:{pv_module_longitudinal_hole_distance_1:'350',pv_module_longitudinal_hole_distance_2:'400',pv_module_longitudinal_hole_distance_3:''}}).compatible,true);
-  assert.equal(engine.moduleRailCompatibility({inputs:{pv_module_longitudinal_hole_distance_1:'350',pv_module_longitudinal_hole_distance_2:'790',pv_module_longitudinal_hole_distance_3:'1200'}}).compatible,true);
+  const fourHundred=engine.moduleRailCompatibility({inputs:{pv_module_longitudinal_hole_distance_1:'350',pv_module_longitudinal_hole_distance_2:'400',pv_module_longitudinal_hole_distance_3:''}});
+  const sevenNinety=engine.moduleRailCompatibility({inputs:{pv_module_longitudinal_hole_distance_1:'350',pv_module_longitudinal_hole_distance_2:'790',pv_module_longitudinal_hole_distance_3:'1200'}});
+  const both=engine.moduleRailCompatibility({inputs:{pv_module_longitudinal_hole_distance_1:'790',pv_module_longitudinal_hole_distance_2:'400',pv_module_longitudinal_hole_distance_3:'400'}});
+  assert.equal(fourHundred.compatible,true);
+  assert.deepEqual([...fourHundred.compatibleDistances],[400]);
+  assert.equal(sevenNinety.compatible,true);
+  assert.deepEqual([...sevenNinety.compatibleDistances],[790]);
+  assert.equal(both.compatible,true);
+  assert.deepEqual([...both.compatibleDistances],[400,790]);
   assert.equal(engine.moduleRailCompatibility({inputs:{pv_module_longitudinal_hole_distance_1:'350',pv_module_longitudinal_hole_distance_2:'600',pv_module_longitudinal_hole_distance_3:''}}).compatible,false);
   assert.equal(engine.moduleRailCompatibility({inputs:{}}).compatible,false);
 });
@@ -80,6 +87,9 @@ test('Tracker Sketch and Inputs render the requested clearance and compatibility
   const app=read('app.js'),styles=read('style.css');
   assert.match(app,/Compatible with Module Rail/);
   assert.match(app,/Not Compatible with Module Rail/);
+  assert.match(app,/detected\.length===2/);
+  assert.match(app,/longitudinal-hole-distance-row/);
+  assert.doesNotMatch(app,/module-rail-compatibility-row/);
   assert.match(app,/Hat Rail installation clearance warning/);
   assert.match(app,/Hat Rail Installation Check/);
   assert.match(app,/Closest Torque Tube Overlap \/ Gap/);

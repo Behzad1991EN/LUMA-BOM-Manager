@@ -251,10 +251,12 @@
       .filter(value=>value!==null&&value!==undefined&&String(value).trim()!=='')
       .map(value=>Number(value))
       .filter(Number.isFinite);
-    const compatibleDistance=distances.find(distance=>MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM.includes(distance));
+    const compatibleDistances=MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM
+      .filter(distance=>distances.includes(distance));
     return {
-      compatible:compatibleDistance!==undefined,
-      compatibleDistance:compatibleDistance??null,
+      compatible:compatibleDistances.length>0,
+      compatibleDistance:compatibleDistances[0]??null,
+      compatibleDistances,
       distances,
       allowedDistances:[...MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM],
     };

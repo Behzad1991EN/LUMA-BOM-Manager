@@ -511,15 +511,20 @@ function activateTab(id,store=true){
 function inputRow(label,key,value,extra=''){
   return `<div class="form-row"><label for="input_${key}">${escapeHtml(label)}</label><input id="input_${key}" data-input-key="${key}" value="${escapeHtml(value)}" ${extra}><span></span></div>`;
 }
-function tripleInputRow(label,keys,values){
-  const placeholders=['400','790','1400'];
-  return `<div class="form-row"><label for="input_${keys[0]}">${escapeHtml(label)}</label><div class="triple-input-row">${keys.map((key,index)=>`<input id="input_${key}" data-input-key="${key}" data-max-digits="4" inputmode="numeric" maxlength="4" placeholder="${placeholders[index]}" aria-label="${escapeHtml(label)} ${index+1}" value="${escapeHtml(values[index]??'')}">`).join('')}</div><span></span></div>`;
-}
 function moduleRailCompatibilityMarkup(project){
   const result=E.moduleRailCompatibility(project),status=result.compatible?'compatible':'incompatible';
+  const detected=result.compatibleDistances||[];
+  const detail=detected.length===2
+    ?`${detected[0]} and ${detected[1]} mm mounting holes detected`
+    :detected.length===1?`${detected[0]} mm mounting holes detected`:'Enter 400 or 790 mm';
   const heading=result.compatible?'Compatible with Module Rail':'Not Compatible with Module Rail';
-  const detail=result.compatible?`${result.compatibleDistance} mm mounting holes detected.`:'Enter 400 or 790 mm in at least one field.';
-  return `<output id="moduleRailCompatibility" class="module-rail-compatibility ${status}" role="status" aria-live="polite"><strong>${heading}</strong><span>${detail}</span></output>`;
+  return `<output id="moduleRailCompatibility" class="module-rail-compatibility ${status}" role="status" aria-live="polite"><strong>${heading}</strong><span>— ${detail}</span></output>`;
+}
+function longitudinalHoleDistanceInputRow(project){
+  const keys=['pv_module_longitudinal_hole_distance_1','pv_module_longitudinal_hole_distance_2','pv_module_longitudinal_hole_distance_3'];
+  const values=keys.map(key=>project.inputs[key]);
+  const label='PV Module Longitudinal Hole Distance (mm)',placeholders=['400','790','1400'];
+  return `<div class="form-row longitudinal-hole-distance-row"><label for="input_${keys[0]}">${label}</label><div class="triple-input-row">${keys.map((key,index)=>`<input id="input_${key}" data-input-key="${key}" data-max-digits="4" inputmode="numeric" maxlength="4" placeholder="${placeholders[index]}" aria-label="${label} ${index+1}" value="${escapeHtml(values[index]??'')}">`).join('')}</div>${moduleRailCompatibilityMarkup(project)}</div>`;
 }
 function updateModuleRailCompatibilityDisplay(project){
   const existing=document.getElementById('moduleRailCompatibility');if(!existing)return;
@@ -585,8 +590,7 @@ function renderInputsTab(){
       ${inputRow('PV Module Width (mm)','pv_module_width',i.pv_module_width)}
       ${inputRow('PV Module Length (mm)','pv_module_length',i.pv_module_length)}
       ${inputRow('PV Module Transverse Hole Distance (mm)','pv_module_hole_distance',i.pv_module_hole_distance)}
-      ${tripleInputRow('PV Module Longitudinal Hole Distance (mm)',['pv_module_longitudinal_hole_distance_1','pv_module_longitudinal_hole_distance_2','pv_module_longitudinal_hole_distance_3'],[i.pv_module_longitudinal_hole_distance_1,i.pv_module_longitudinal_hole_distance_2,i.pv_module_longitudinal_hole_distance_3])}
-      <div class="form-row module-rail-compatibility-row">${moduleRailCompatibilityMarkup(p)}</div>
+      ${longitudinalHoleDistanceInputRow(p)}
       ${inputRow('Hat Rail Hole Distance (mm)','hat_rail_hole_distance',i.hat_rail_hole_distance)}
       ${inputRow('Z Rail Design Offset (mm)','z_rail_offset',i.z_rail_offset)}
       <div class="form-row"><label for="input_pv_module_gap">PV Module Gap (mm)</label><div class="lock-row"><input id="input_pv_module_gap" value="${escapeHtml(i.pv_module_gap)}" ${i.pv_gap_locked?'readonly':''}><button id="pvGapLock" class="lock-switch ${i.pv_gap_locked?'':'unlocked'}" title="Locked mode: PV Module Gap = PV Module Transverse Hole Distance + Hat Rail Hole Distance - PV Module Width"><span>${i.pv_gap_locked?'LOCK':'UNLOCK'}</span></button></div><span></span></div>
