@@ -29,6 +29,9 @@
     Object.freeze({key:'k001552',tag:'k001552',label:'SCADA Power Supply HDR-30-24',perTrackers:100}),
     Object.freeze({key:'k001525',tag:'k001525',label:'Higeco GWC V4 4DIN',perTrackers:100}),
   ]);
+  const MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM = Object.freeze([400,790]);
+  const HAT_RAIL_OVERLAP_MIN_CLEARANCE_MM = 50;
+  const HAT_RAIL_BEARING_PILE_MIN_CLEARANCE_MM = 100;
 
   function normalizeText(value){
     return String(value ?? '').trim().toLowerCase().replaceAll('×','x').replace(/[^a-z0-9]+/g,'');
@@ -241,6 +244,21 @@
     const i = project.inputs || {};
     return asNumber(i.pv_module_hole_distance,1093) + asNumber(i.hat_rail_hole_distance,60) - asNumber(i.pv_module_width,1134);
   }
+  function moduleRailCompatibility(project){
+    const inputs=project?.inputs||project||{};
+    const distances=[1,2,3]
+      .map(index=>inputs[`pv_module_longitudinal_hole_distance_${index}`])
+      .filter(value=>value!==null&&value!==undefined&&String(value).trim()!=='')
+      .map(value=>Number(value))
+      .filter(Number.isFinite);
+    const compatibleDistance=distances.find(distance=>MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM.includes(distance));
+    return {
+      compatible:compatibleDistance!==undefined,
+      compatibleDistance:compatibleDistance??null,
+      distances,
+      allowedDistances:[...MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM],
+    };
+  }
   function getAnemometerSelection(project){
     const elevation=asNumber(project?.inputs?.elevation_asl,0);
     return elevation>=ANEMOMETER_ELEVATION_THRESHOLD_M?ANEMOMETER_OPTIONS.cold:ANEMOMETER_OPTIONS.normal;
@@ -306,6 +324,12 @@
       'Required South Side':south.required,
       'Zone A End (120)':zoneAEnd,
       'Zone B End (110)':zoneBEnd,
+      'Overlap A/B (mm)':d.overlap_ab,
+      'Overlap B/C (mm)':d.overlap_bc,
+      'A/B Overlap Start from Midplane':Math.max(0,zoneAEnd-d.overlap_ab),
+      'A/B Overlap End from Midplane':zoneAEnd,
+      'B/C Overlap Start from Midplane':Math.max(0,zoneBEnd-d.overlap_bc),
+      'B/C Overlap End from Midplane':zoneBEnd,
       'Base Until C':baseUntilC,
       'Main Tube C Start from Midplane':baseUntilC,
       'Main Tube C Required Length':isOddTracker?`N:${niceNumber(north.main_c_required)} / S:${niceNumber(south.main_c_required)}`:north.main_c_required,
@@ -452,6 +476,83 @@
     }
     return rails;
   }
+  function clearanceFromInterval(position,start,end){
+    const low=Math.min(start,end),high=Math.max(start,end);
+    if(position<low)return low-position;
+    if(position>high)return position-high;
+    return 0;
+  }
+  function torqueTubeOverlapZonesForSide(project,geometry,side){
+    const d=getDesignInputs(project),sideName=String(side).toLowerCase().startsWith('n')?'North':'South';
+    const zoneAEnd=asNumber(geometry['Zone A End (120)'],0),zoneBEnd=asNumber(geometry['Zone B End (110)'],0);
+    const firstPiece=String(geometry['First Piece Name']||'Torque Tube A');
+    const zones=[];
+    if(d.overlap_ab>0&&zoneAEnd>0)zones.push({
+      key:'A/B',
+      label:`${firstPiece} / Torque Tube B overlap`,
+      start:Math.max(0,zoneAEnd-d.overlap_ab),
+      end:zoneAEnd,
+    });
+    const cRequired=asNumber(geometry[`Main Tube C Required Length ${sideName}`],0);
+    if(d.overlap_bc>0&&zoneBEnd>0&&cRequired>0)zones.push({
+      key:'B/C',
+      label:'Torque Tube B / Torque Tube C overlap',
+      start:Math.max(0,zoneBEnd-d.overlap_bc),
+      end:zoneBEnd,
+    });
+    return zones;
+  }
+  function hatRailTubeLabel(geometry,rail){
+    const zone=String(rail?.['Beam Zone']||'');
+    if(zone.startsWith('A'))return String(geometry['First Piece Name']||'Torque Tube A');
+    if(zone.startsWith('B'))return 'Torque Tube B';
+    if(zone.startsWith('C'))return 'Torque Tube C';
+    return 'Outside Tracker';
+  }
+  function calculateHatRailInstallationClearances(project,geometry,bearingRows=[],railRows=[]){
+    const rows=(railRows||[]).map(row=>({...row})),warnings=[],violations=[];
+    for(const sideName of ['North','South']){
+      const sideRails=rows.filter(row=>row.Side===sideName&&row['Rail Type']==='Hat Rail');
+      const overlaps=torqueTubeOverlapZonesForSide(project,geometry,sideName);
+      const bearings=(bearingRows||[]).filter(row=>{
+        if(row.Side)return row.Side===sideName;
+        const position=asNumber(row['Distance from Main Post (mm)'],0);
+        return sideName==='North'?position>=0:position<=0;
+      }).map((row,index)=>({
+        row,
+        position:Math.abs(asNumber(row['Distance from Main Post (mm)'],0)),
+        label:`${sideName} Bearing Pile ${asInt(row['Pair No.'],index+1)}`,
+      }));
+      sideRails.forEach((rail,index)=>{
+        const position=Math.abs(asNumber(rail['Signed Distance from Mid Plane (mm)']??rail['Distance from Mid Plane (mm)'],0));
+        const railNumber=index+1,prefix=sideName==='North'?'N':'S';
+        const railLabel=`${sideName} Hat Rail ${railNumber} (between PV Modules ${prefix}${railNumber} and ${prefix}${railNumber+1})`;
+        const overlap=overlaps.map(zone=>({...zone,clearance:clearanceFromInterval(position,zone.start,zone.end)})).sort((a,b)=>a.clearance-b.clearance)[0]||null;
+        const containingOverlap=overlaps.find(zone=>position>=Math.min(zone.start,zone.end)&&position<=Math.max(zone.start,zone.end));
+        const bearing=bearings.map(item=>({...item,clearance:Math.abs(position-item.position)})).sort((a,b)=>a.clearance-b.clearance)[0]||null;
+        const issues=[];
+        if(overlap&&overlap.clearance<HAT_RAIL_OVERLAP_MIN_CLEARANCE_MM){
+          const message=`${railLabel}: ${niceNumber(overlap.clearance)} mm from ${overlap.label}; minimum ${HAT_RAIL_OVERLAP_MIN_CLEARANCE_MM} mm.`;
+          issues.push(message);violations.push({type:'overlap',side:sideName,railNumber,position,clearance:overlap.clearance,minimum:HAT_RAIL_OVERLAP_MIN_CLEARANCE_MM,message});
+        }
+        if(bearing&&bearing.clearance<HAT_RAIL_BEARING_PILE_MIN_CLEARANCE_MM){
+          const message=`${railLabel}: ${niceNumber(bearing.clearance)} mm from ${bearing.label}; minimum ${HAT_RAIL_BEARING_PILE_MIN_CLEARANCE_MM} mm.`;
+          issues.push(message);violations.push({type:'bearing-pile',side:sideName,railNumber,position,clearance:bearing.clearance,minimum:HAT_RAIL_BEARING_PILE_MIN_CLEARANCE_MM,message});
+        }
+        rail['Hat Rail No.']=railNumber;
+        rail['PV Modules']=`${prefix}${railNumber} / ${prefix}${railNumber+1}`;
+        rail['Sits On']=containingOverlap?.label||hatRailTubeLabel(geometry,rail);
+        rail['Nearest Torque Tube Overlap']=overlap?.label||'Not applicable';
+        rail['Overlap Clearance (mm)']=overlap?niceNumber(overlap.clearance):'';
+        rail['Nearest Bearing Pile']=bearing?.label||'Not applicable';
+        rail['Bearing Pile Clearance (mm)']=bearing?niceNumber(bearing.clearance):'';
+        rail['Clearance Status']=issues.length?'Warning':'OK';
+        rail['Clearance Warning']=issues.join(' ');
+        warnings.push(...issues);
+      });
+    }
+    return {Rows:rows,Warnings:warnings,Violations:violations,Status:warnings.length?'Warning':'OK'};
+  }
   function closestRailIndicesAroundPosition(rails,bearingPosition){
     if(!rails.length) return [];
     const positions=rails.map(r=>asNumber(r['Distance from Mid Plane (mm)'],0));
@@ -579,15 +680,19 @@
           '_bearing_rows':bearingResult.Rows,
         });
         const supportResult=calculateModuleSupportPlatesForTracker(project,row,geometry,bearingResult.Rows);
+        const clearanceResult=calculateHatRailInstallationClearances(project,geometry,bearingResult.Rows,supportResult.Rows);
         Object.assign(row,{
           'Module Support Plates / Side':supportResult['Module Support Plates / Side'],
           'Module Support Plates / North Side':supportResult['Module Support Plates / North Side'],
           'Module Support Plates / South Side':supportResult['Module Support Plates / South Side'],
           'Module Support Plates / Tracker':supportResult['Module Support Plates / Tracker'],
-          '_module_support_rows':supportResult.Rows,
-          '_module_support_rows_right':supportResult['Rows Right Side'],
-          '_module_support_rows_north':supportResult['Rows North Side'],
-          '_module_support_rows_south':supportResult['Rows South Side'],
+          'Hat Rail Installation Status':clearanceResult.Status,
+          'Hat Rail Installation Warnings':clearanceResult.Warnings,
+          'Hat Rail Installation Violations':clearanceResult.Violations,
+          '_module_support_rows':clearanceResult.Rows,
+          '_module_support_rows_right':clearanceResult.Rows.filter(item=>item.Side==='North'),
+          '_module_support_rows_north':clearanceResult.Rows.filter(item=>item.Side==='North'),
+          '_module_support_rows_south':clearanceResult.Rows.filter(item=>item.Side==='South'),
         });
         rows.push(row);
       });
@@ -1031,12 +1136,12 @@
   }
 
   global.LumaEngine={
-    PART_COLUMNS,DEFAULT_INPUTS,BOM_DEFINITIONS,BOM_DEFAULT_METADATA,ANEMOMETER_ELEVATION_THRESHOLD_M,ANEMOMETER_OPTIONS,PLANT_ELECTRICAL_ITEMS,
+    PART_COLUMNS,DEFAULT_INPUTS,BOM_DEFINITIONS,BOM_DEFAULT_METADATA,ANEMOMETER_ELEVATION_THRESHOLD_M,ANEMOMETER_OPTIONS,PLANT_ELECTRICAL_ITEMS,MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM,HAT_RAIL_OVERLAP_MIN_CLEARANCE_MM,HAT_RAIL_BEARING_PILE_MIN_CLEARANCE_MM,
     normalizeText,displayTerminology,asNumber,asInt,niceNumber,firstNonEmpty,ceilHalf,ceilUp,
     fastenerPartNameFromDescription,normalizePartMasterData,defaultTrackerQuantities,defaultManualParts,defaultBearingRule,normalizeBearingRule,BEARING_RULE_MODES,normalizeBearingMode,bearingRuleVariantKey,normalizeBearingRuleVariants,
-    getDesignInputs,calculateAutoPvModuleGap,getAnemometerSelection,cadBlocksAreAvailable,getBomModeText,getSpanLimits,estimateSpanCountForLength,
+    getDesignInputs,calculateAutoPvModuleGap,moduleRailCompatibility,getAnemometerSelection,cadBlocksAreAvailable,getBomModeText,getSpanLimits,estimateSpanCountForLength,
     calculateTrackerGeometry,getBearingRuleVariantsForPv,getBearingRuleForPv,getPositionsFromRule,classifyBearing,classifyBeamZoneForPosition,calculateEstimatedBearingPositions,calculateBearingLayoutForTracker,
-    generateModuleRailPositionsForSide,closestRailIndicesAroundPosition,calculateModuleSupportPlatesForTracker,buildSchedule,buildBearingLayoutTable,buildModuleSupportLayoutTable,
+    generateModuleRailPositionsForSide,clearanceFromInterval,torqueTubeOverlapZonesForSide,calculateHatRailInstallationClearances,closestRailIndicesAroundPosition,calculateModuleSupportPlatesForTracker,buildSchedule,buildBearingLayoutTable,buildModuleSupportLayoutTable,
     recordIsFastener,itemIsFastener,recordIsValidForCalculatedItem,findPartMasterMatch,bomRowKey,normalizeSoltrkVersion,scheduleRowIdentity,torqueTubeJointCountForRow,equipmentQuantityAllocation,buildProjectBom,buildPartMasterPreview,calculateProject,
   };
 })(globalThis);

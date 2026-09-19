@@ -34,11 +34,11 @@ test('Tube Spacer is a Fasteners item with the requested description and linked 
   assert.match(read('engine.js'),/\['k001479 - Tube Spacer',r=>2\*torqueTubeConnectionFastenersForRow\(r\)/);
 });
 
-test('Project BOM export fills complete bordered rows without changing other sheets',async()=>{
+test('Excel export borders every filled cell and keeps complete Project BOM row borders',async()=>{
   const context=vm.createContext({Blob,TextEncoder,Uint8Array});
   vm.runInContext(read('xlsx-lite.js'),context,{filename:'xlsx-lite.js'});
   const blob=context.XlsxLite.createWorkbookBlob([
-    {name:'Summary',rows:[['Field','Value'],['Project','Sample']]},
+    {name:'Summary',rows:[['Field','Value','Optional'],['Project','Sample',''],['Zero',0,'Complete']]},
     {name:'Project BOM',rows:[
       ['TAG','Category','Total Qty'],
       ['k001152','Steel Structure / Post',2],
@@ -61,5 +61,8 @@ test('Project BOM export fills complete bordered rows without changing other she
     for(const column of ['A','B','C'])assert.match(rowXml,new RegExp(`<c r="${column}${row}" s="${style}"`));
   }
   assert.match(summary,/<c r="A2" s="2"/);
+  assert.match(summary,/<c r="B3" s="2" t="n"><v>0<\/v>/,'numeric zero is a filled bordered cell');
+  assert.match(summary,/<c r="C3" s="2"/,'filled text receives the simple border');
+  assert.match(summary,/<c r="C2" s="0"/,'an intentionally blank non-BOM cell is not bordered');
   assert.match(read('app.js'),/rowStyles:bomRowStyles,borderEveryCell:true/);
 });

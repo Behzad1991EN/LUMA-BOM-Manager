@@ -1900,6 +1900,44 @@ textarea:focus {
     min-width: 0;
 }
 
+.module-rail-compatibility-row {
+    min-height: 0;
+    margin-top: -4px;
+}
+
+.module-rail-compatibility {
+    grid-column: 2;
+    display: flex;
+    width: 278px;
+    box-sizing: border-box;
+    flex-direction: column;
+    gap: 2px;
+    padding: 7px 10px;
+    border: 1px solid currentColor;
+    background: #fff;
+    line-height: 1.25;
+}
+
+.module-rail-compatibility strong {
+    font-size: 13px;
+}
+
+.module-rail-compatibility span {
+    font-size: 12px;
+}
+
+.module-rail-compatibility.compatible {
+    color: #166534;
+    border-color: #86C99A;
+    background: #ECFDF3;
+}
+
+.module-rail-compatibility.incompatible {
+    color: #B91C1C;
+    border-color: #E7A0A0;
+    background: #FEF2F2;
+}
+
 .anemometer-selection {
     display: flex;
     min-width: 0;
@@ -3609,6 +3647,50 @@ th.wrap {
     height: 100%;
 }
 
+.sketch-clearance-status {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    margin: 0 0 10px;
+    border: 1px solid;
+    line-height: 1.35;
+}
+
+.sketch-clearance-status strong {
+    font-size: 14px;
+}
+
+.sketch-clearance-status span,
+.sketch-clearance-status li {
+    font-size: 13px;
+}
+
+.sketch-clearance-status ul {
+    margin: 3px 0 0 20px;
+    padding: 0;
+}
+
+.sketch-clearance-status.warning {
+    color: #991B1B;
+    border-color: #E7A0A0;
+    background: #FEF2F2;
+}
+
+.sketch-clearance-status.success {
+    color: #166534;
+    border-color: #86C99A;
+    background: #ECFDF3;
+}
+
+.sketch-clearance-details {
+    margin-top: 18px;
+}
+
+.sketch-clearance-details .table-wrap {
+    max-height: 370px;
+}
+
 .sketch-magnifier-lens {
     position: fixed;
     width: 230px;
@@ -4197,7 +4279,8 @@ th.wrap {
 
     .form-row input,
     .form-row select,
-    .triple-input-row {
+    .triple-input-row,
+    .module-rail-compatibility {
         width: 100%;
         min-width: 0;
     }
@@ -4395,6 +4478,10 @@ th.wrap {
     }
 
     .anemometer-selection {
+        grid-column: 1;
+    }
+
+    .module-rail-compatibility {
         grid-column: 1;
     }
 

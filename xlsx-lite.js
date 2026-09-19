@@ -5,6 +5,7 @@
   function xmlEscape(value){return String(value??'').replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&apos;'}[ch]));}
   function colName(n){let s='';while(n>0){n--;s=String.fromCharCode(65+n%26)+s;n=Math.floor(n/26);}return s;}
   function safeSheetName(name,used){let base=String(name||'Sheet').replace(/[\\/?*:\[\]]/g,' ').trim().slice(0,31)||'Sheet';let finalName=base,i=2;while(used.has(finalName)){const suffix=` ${i++}`;finalName=base.slice(0,31-suffix.length)+suffix;}used.add(finalName);return finalName;}
+  function hasCellValue(value){return value!==null&&value!==undefined&&value!=='';}
   function cellXml(value,row,col,style){
     const ref=`${colName(col)}${row}`;
     if(typeof value==='number' && Number.isFinite(value)) return `<c r="${ref}" s="${style}" t="n"><v>${value}</v></c>`;
@@ -20,9 +21,13 @@
     }
     const cols=widths.map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join('');
     const rowXml=rows.map((values,ri)=>{
-      const style=ri===0?1:table.rowStyles?.[ri]==='steelStructure'?3:table.rowStyles?.[ri]==='fasteners'?4:2;
+      const rowStyle=table.rowStyles?.[ri]==='steelStructure'?3:table.rowStyles?.[ri]==='fasteners'?4:2;
       const cellCount=table.borderEveryCell?maxCols:values.length;
-      const cells=Array.from({length:cellCount},(_,ci)=>cellXml(values[ci],ri+1,ci+1,style)).join('');
+      const cells=Array.from({length:cellCount},(_,ci)=>{
+        const value=values[ci],filled=hasCellValue(value);
+        const style=ri===0?(filled?1:0):((filled||table.borderEveryCell)?rowStyle:0);
+        return cellXml(value,ri+1,ci+1,style);
+      }).join('');
       return `<row r="${ri+1}">${cells}</row>`;
     }).join('');
     const dim=`A1:${colName(maxCols)}${Math.max(rows.length,1)}`;

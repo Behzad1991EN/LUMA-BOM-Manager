@@ -201,6 +201,6 @@ test('Part Master add and edit form uses organized responsive field sections', (
   assert.match(styles, /\.pm-form-grid-three/);
   assert.match(styles, /\.pm-post-fields\[hidden\]/);
   assert.match(styles, /@media \(max-width: 700px\)/);
-  assert.match(html, /style\.css\?v=20260917-v4/);
+  assert.match(html, /style\.css\?v=20260919-clearance/);
   assert.match(html, /admin-part-master\.js\?v=20260917-pile-terminology/);
 });
