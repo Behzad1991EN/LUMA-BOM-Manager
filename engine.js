@@ -620,35 +620,24 @@
   }
   */
 
-  // TEMPORARY K001099 / PLUSS00173BZ00 RULE:
-  // PV modules - 2 + 2 × Bearing 110 + 6 × Bearing 100, per tracker.
-  function calculateModuleSupportPlatesForTracker(project,scheduleRow,geometry,bearingRows=[]){
+  // K001099 / PLUSS00173BZ00: each module rail, including end Z rails,
+  // receives support plates according to the torque-tube size beneath it.
+  function calculateModuleSupportPlatesForTracker(project,scheduleRow,geometry){
     const pvCount=asInt(scheduleRow['PV Modules per Tracker'],0);
     function calculateSide(sideName){
-      const rails=generateModuleRailPositionsForSide(project,pvCount,geometry,sideName),reasons=rails.map(()=>[]),influences=rails.map(()=>[]);
-      rails.forEach((rail,index)=>{
-        const base=rail['Rail Type']==='Hat Rail'?1:0;
-        rail['Base Plates']=base;rail['Bearing Required Plates']=0;rail['Final Plates / Rail / Side']=base;
-        reasons[index].push(base?'Temporary formula base: 1 plate per Hat rail':'Temporary formula base: 0 plates per Z rail');
-      });
-      (bearingRows||[]).filter(bearing=>bearing.Side===sideName).forEach(bearing=>{
-        const bearingType=String(bearing['Bearing Type']||''),additionPerRail=bearingType==='Bearing 110'?1:(bearingType==='Bearing 100'?3:0);
-        if(!additionPerRail)return;
-        const position=Math.abs(asNumber(bearing['Distance from Main Post (mm)'],0));
-        const nearest=rails.map((rail,index)=>({index,distance:Math.abs(asNumber(rail['Distance from Mid Plane (mm)'],0)-position)})).sort((a,b)=>a.distance-b.distance||a.index-b.index).slice(0,2);
-        nearest.forEach(({index})=>{
-          rails[index]['Bearing Required Plates']+=additionPerRail;
-          rails[index]['Final Plates / Rail / Side']+=additionPerRail;
-          reasons[index].push(`${bearingType} at ${niceNumber(position)} mm: +${additionPerRail}`);
-          influences[index].push(`${bearingType} @ ${niceNumber(position)} mm`);
-        });
-      });
+      const rails=generateModuleRailPositionsForSide(project,pvCount,geometry,sideName);
       let total=0;
-      rails.forEach((rail,index)=>{
-        rail['Reason']=reasons[index].join('; ');
-        rail['Influence Bearing']=influences[index].join(', ');
-        rail['Influence Bearing Distance']=influences[index].length?influences[index].map(value=>value.split(' @ ')[1]).join(', '):'';
-        total+=asInt(rail['Final Plates / Rail / Side'],0);
+      rails.forEach(rail=>{
+        const zone=String(rail['Beam Zone']||'');
+        const plates=zone.startsWith('C / 100')?3:zone.startsWith('B / 110')?2:zone.startsWith('A / 120')?1:0;
+        rail['Base Plates']=plates;
+        rail['Bearing Required Plates']=0;
+        rail['Beam Compensation']=0;
+        rail['Final Plates / Rail / Side']=plates;
+        rail['Reason']=plates?`${plates} support plate${plates===1?'':'s'} for module rail on ${zone.slice(-3)} × ${zone.slice(-3)} Torque Tube`:'No support plate: module rail is outside the Torque Tubes';
+        rail['Influence Bearing']='';
+        rail['Influence Bearing Distance']='';
+        total+=plates;
       });
       return [rails,total];
     }
@@ -681,7 +670,7 @@
           'Span Type':bearingResult['Span Type'],
           '_bearing_rows':bearingResult.Rows,
         });
-        const supportResult=calculateModuleSupportPlatesForTracker(project,row,geometry,bearingResult.Rows);
+        const supportResult=calculateModuleSupportPlatesForTracker(project,row,geometry);
         const clearanceResult=calculateHatRailInstallationClearances(project,geometry,bearingResult.Rows,supportResult.Rows);
         Object.assign(row,{
           'Module Support Plates / Side':supportResult['Module Support Plates / Side'],
@@ -933,8 +922,7 @@
     ['Module Rail Fixing Part',r=>(Math.max(asInt(r['PV Modules per Tracker'])-2,0)+4+1)*asInt(r['Number of Trackers']),['module rail fixing','rail fixing','fixing part','rail lower clamp','lower clamp'],'Module Rails / Support','Hat Rail + Z Rail + 1 per tracker'],
     // Previous K001099 / PLUSS00173BZ00 calculation (kept for future restoration):
     // ['Module Rail Support Plate',r=>asInt(r['Module Support Plates / Tracker'])*asInt(r['Number of Trackers']),['k001099','module support plate','support plate','module rail support plate'],'Module Rails / Support','Existing formula kept: rail-by-rail bearing influence, taper, and main tube height compensation'],
-    // Temporary calculation: PV modules - 2 + 2 × Bearing 110 + 6 × Bearing 100.
-    ['Module Rail Support Plate',r=>asInt(r['Module Support Plates / Tracker'])*asInt(r['Number of Trackers']),['k001099','module support plate','support plate','module rail support plate'],'Module Rails / Support','Temporary formula for K001099 / PLUSS00173BZ00: (PV modules − 2) + (2 × Bearing 110) + (6 × Bearing 100), per tracker'],
+    ['Module Rail Support Plate',r=>asInt(r['Module Support Plates / Tracker'])*asInt(r['Number of Trackers']),['k001099','module support plate','support plate','module rail support plate'],'Module Rails / Support','Per module rail (Hat or Z): 3 plates on 100 × 100 Torque Tube, 2 on 110 × 110, 1 on 120 × 120; sum per tracker'],
     ['Module Rail Elevation Plate',r=>2*asInt(r['Bearing 100 / Tracker'])*asInt(r['Number of Trackers']),['k001573','module elevation plate','elevation plate','module rail elevation plate'],'Module Rails / Support','2 × Bearing 100'],
     ['Limit Switch Holder',r=>asInt(r['Number of Trackers']),['limit switch holder'],'Steel Structure','Main Post'],
     ['Limit Switch Trigger',r=>asInt(r['Number of Trackers']),['limit switch trigger','limit switch frame'],'Steel Structure','Main Post'],

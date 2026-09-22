@@ -85,9 +85,17 @@ test('exact minimum clearances of 50 mm and 100 mm pass',()=>{
 
 test('Tracker Sketch and Inputs render the requested clearance and compatibility messages',()=>{
   const app=read('app.js'),styles=read('style.css');
-  assert.match(app,/Compatible with Module Rail/);
-  assert.match(app,/Not Compatible with Module Rail/);
-  assert.match(app,/detected\.length===2/);
+  const start=app.indexOf('function moduleRailCompatibilityMarkup(');
+  const end=app.indexOf('function longitudinalHoleDistanceInputRow(',start);
+  const context={E:loadEngine()};
+  vm.createContext(context);
+  vm.runInContext(`${app.slice(start,end)};this.markup=moduleRailCompatibilityMarkup;`,context);
+  const project=(first,second,third)=>({inputs:{pv_module_longitudinal_hole_distance_1:first,pv_module_longitudinal_hole_distance_2:second,pv_module_longitudinal_hole_distance_3:third}});
+  assert.match(context.markup(project('350','','')),/>Not Compatible<\/strong>/);
+  assert.doesNotMatch(context.markup(project('350','','')),/Enter 400 or 790/);
+  assert.match(context.markup(project('400','','')),/>Compatible with 400 mm<\/strong>/);
+  assert.match(context.markup(project('790','','')),/>Compatible with 790 mm<\/strong>/);
+  assert.match(context.markup(project('790','400','')),/>Compatible with 400 and 790 mm<\/strong>/);
   assert.match(app,/longitudinal-hole-distance-row/);
   assert.doesNotMatch(app,/module-rail-compatibility-row/);
   assert.match(app,/Hat Rail installation clearance warning/);
@@ -95,5 +103,6 @@ test('Tracker Sketch and Inputs render the requested clearance and compatibility
   assert.match(app,/Closest Torque Tube Overlap \/ Gap/);
   assert.match(styles,/\.module-rail-compatibility\.compatible/);
   assert.match(styles,/\.module-rail-compatibility\.incompatible/);
+  assert.match(styles,/278px\s+minmax\(130px, 556px\)/);
   assert.match(styles,/\.sketch-clearance-status\.warning/);
 });

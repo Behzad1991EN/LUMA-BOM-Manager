@@ -1868,7 +1868,7 @@ textarea:focus {
     grid-template-columns:
         405px
         278px
-        minmax(130px, 1fr);
+        minmax(130px, 556px);
 
     align-items: center;
 

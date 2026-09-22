@@ -2,8 +2,8 @@
 
 const E = LumaEngine;
 const APP_NAME = 'LUMA BOM Manager';
-const APP_VERSION = 'Version 4.00';
-const APP_RELEASE_DATE = '17.09.2026';
+const APP_VERSION = 'Version 4.10';
+const APP_RELEASE_DATE = '22.09.2026';
 const APP_AUTHOR = 'Behzad Eydiyoon';
 const WORKSPACE_FORMAT_VERSION = '1.0';
 const RECOVERY_KEY = 'luma_bom_manager_v3_43_browser_recovery';
@@ -119,7 +119,7 @@ const BEARING_COLUMNS = [
   'PV Modules per Tracker','Bearing Rule Mode','Number of Trackers','Bearing Rule Source','Span Type','Pair No.','Side','Gap from Previous (mm)','Distance from Main Post (mm)','Absolute Distance (mm)','Beam Zone','Bearing Type','Status','Total Bearing Qty'
 ];
 const SUPPORT_DETAIL_COLUMNS = [
-  'PV Modules per Tracker','Bearing Rule Mode','Number of Trackers','Side','Rail No.','Rail Type','Signed Distance from Mid Plane (mm)','Distance from Mid Plane (mm)','Beam Zone','Final Plates / Rail / Side','Total Plates','Influence Bearing','Influence Bearing Distance','Reason'
+  'PV Modules per Tracker','Bearing Rule Mode','Number of Trackers','Side','Rail No.','Rail Type','Signed Distance from Mid Plane (mm)','Distance from Mid Plane (mm)','Beam Zone','Final Plates / Rail / Side','Total Plates','Reason'
 ];
 const PART_PREVIEW_COLUMNS = ['No.','Part Name','TAG','Description','Part Number','Category','Unit','Material','Weight','Calculation Note'];
 const PART_EDITABLE_COLUMNS = new Set(['Part Name','TAG','Description','Part Number','Category','Material','Weight']);
@@ -149,9 +149,15 @@ const CHANGELOG = {
     'Improved Project BOM controls for SOLTRK versions and editable equipment quantities, including plant-wide electrical quantities and SOLTRK 3.0 plates',
     'Updated torque-tube joint fastener calculations and Tube Spacer k001479 to 2 × k001388 in the Fasteners category',
     'Improved Analysis and Part Master tables and added complete cell borders and category-colored rows to the exported Project BOM'
+  ],
+  '4.10': [
+    'Changed PV Module Support Plate quantities to 1, 2, or 3 per module rail on 120 × 120, 110 × 110, or 100 × 100 Torque Tubes respectively, including end Z rails',
+    'Added Tracker Sketch checks for Hat Rails within 50 mm of Torque Tube overlaps or 100 mm of Bearing Piles, with affected rails identified and highlighted',
+    'Added live 400 mm and 790 mm Module Rail compatibility status beside the longitudinal hole-distance inputs and refined the input status layout',
+    'Added simple borders to every filled cell in exported Excel workbooks'
   ]
 };
-const CHANGELOG_DATES = {'1.00':'26.05.2026','2.00':'08.06.2026','2.10':'16.06.2026','2.20':'17.06.2026','3.00':'08.07.2026','3.10':'22.07.2026','3.11':'27.07.2026','3.20':'18.08.2026','3.30':'19.08.2026','3.40':'20.08.2026','3.41':'24.08.2026','3.42':'25.08.2026','3.43':'25.08.2026','4.00':'17.09.2026'};
+const CHANGELOG_DATES = {'1.00':'26.05.2026','2.00':'08.06.2026','2.10':'16.06.2026','2.20':'17.06.2026','3.00':'08.07.2026','3.10':'22.07.2026','3.11':'27.07.2026','3.20':'18.08.2026','3.30':'19.08.2026','3.40':'20.08.2026','3.41':'24.08.2026','3.42':'25.08.2026','3.43':'25.08.2026','4.00':'17.09.2026','4.10':'22.09.2026'};
 const USER_MANUAL_URL = 'https://ksisolar.sharepoint.com/:b:/s/Engineering/IQA8CGStyAACQ7K8hFJe4jJ6Ad-f3cKvwnyZnM2lhb7yq0I?e=L8zsa5';
 
 let workspace = null;
@@ -513,12 +519,8 @@ function inputRow(label,key,value,extra=''){
 }
 function moduleRailCompatibilityMarkup(project){
   const result=E.moduleRailCompatibility(project),status=result.compatible?'compatible':'incompatible';
-  const detected=result.compatibleDistances||[];
-  const detail=detected.length===2
-    ?`${detected[0]} and ${detected[1]} mm mounting holes detected`
-    :detected.length===1?`${detected[0]} mm mounting holes detected`:'Enter 400 or 790 mm';
-  const heading=result.compatible?'Compatible with Module Rail':'Not Compatible with Module Rail';
-  return `<output id="moduleRailCompatibility" class="module-rail-compatibility ${status}" role="status" aria-live="polite"><strong>${heading}</strong><span>— ${detail}</span></output>`;
+  const message=result.compatible?`Compatible with ${result.compatibleDistances.join(' and ')} mm`:'Not Compatible';
+  return `<output id="moduleRailCompatibility" class="module-rail-compatibility ${status}" role="status" aria-live="polite"><strong>${message}</strong></output>`;
 }
 function longitudinalHoleDistanceInputRow(project){
   const keys=['pv_module_longitudinal_hole_distance_1','pv_module_longitudinal_hole_distance_2','pv_module_longitudinal_hole_distance_3'];
@@ -850,8 +852,10 @@ function buildLogicText(){
   // Previous K001099 calculation log (kept for future restoration):
   // const first=d.motor_gap/2+(d.pv_module_width-d.pv_module_hole_distance)/2+d.z_rail_offset;
   // lines.push('4) MODULE SUPPORT PLATE K001099 CALCULATION','-'.repeat(90),'Rail positions are calculated from mid-plane on one side, then mirrored to the other side.','','First rail position:','Motor Gap / 2 + (PV Module Width - PV Module Transverse Hole Distance) / 2 + Z Rail Offset',`= ${n(d.motor_gap)} / 2 + (${n(d.pv_module_width)} - ${n(d.pv_module_hole_distance)}) / 2 + ${n(d.z_rail_offset)}`,`= ${n(first)} mm`,'','Second rail position increment:','PV Module Transverse Hole Distance + Hat Rail Hole Distance / 2 - Z Rail Offset','','Next rail increment:','PV Module Transverse Hole Distance + Hat Rail Hole Distance','','Support plate rules:','Base condition: each module rail has minimum 1 support plate.','Bearing 110: closest left/right rails get 2 plates.','Bearing 100: closest left/right rails get 4 plates.','Taper rule: 4 → 3 → 2 → 1, or 2 → 1.','Beam height compensation:','A/120 level = 0, B/110 level = 1, C/100 level = 2.','Corrected formula:','Final plates = max(1, taper plates + rail beam level - bearing beam level)','The bearing beam level is used as the reference, not the nearest rail beam level.','',`Module Support Plates / Side = ${n(row['Module Support Plates / Side'])}`,`Module Support Plates / Tracker = ${n(row['Module Support Plates / Tracker'])}`);
-  const baseModuleQty=Math.max(E.asInt(row['PV Modules per Tracker'])-2,0),bearing110=E.asInt(row['Bearing 110 / Tracker']),bearing100=E.asInt(row['Bearing 100 / Tracker']);
-  lines.push('4) MODULE SUPPORT PLATE K001099 / PLUSS00173BZ00 CALCULATION','-'.repeat(90),'TEMPORARY CALCULATION NOTE:','PV Module Support Plate / Tracker = (PV modules − 2) + (2 × Bearing 110) + (6 × Bearing 100).','',`PV modules − 2 = ${n(baseModuleQty)}`,`2 × Bearing 110 = 2 × ${n(bearing110)} = ${n(2*bearing110)}`,`6 × Bearing 100 = 6 × ${n(bearing100)} = ${n(6*bearing100)}`,`Module Support Plates / Tracker = ${n(baseModuleQty)} + ${n(2*bearing110)} + ${n(6*bearing100)} = ${n(row['Module Support Plates / Tracker'])}`,`Module Support Plates / Side = ${n(row['Module Support Plates / Side'])}`);
+  const supportRails=row._module_support_rows||[];
+  const railCountForZone=prefix=>supportRails.filter(rail=>String(rail['Beam Zone']||'').startsWith(prefix)).length;
+  const rails120=railCountForZone('A / 120'),rails110=railCountForZone('B / 110'),rails100=railCountForZone('C / 100');
+  lines.push('4) MODULE SUPPORT PLATE K001099 / PLUSS00173BZ00 CALCULATION','-'.repeat(90),'Each module rail, including end Z rails, is counted by the Torque Tube it sits on.','120 × 120 Torque Tube: 1 plate per rail.','110 × 110 Torque Tube: 2 plates per rail.','100 × 100 Torque Tube: 3 plates per rail.','',`120 × 120 rails: ${n(rails120)} × 1 = ${n(rails120)}`,`110 × 110 rails: ${n(rails110)} × 2 = ${n(rails110*2)}`,`100 × 100 rails: ${n(rails100)} × 3 = ${n(rails100*3)}`,`Module Support Plates / Tracker = ${n(rails120)} + ${n(rails110*2)} + ${n(rails100*3)} = ${n(row['Module Support Plates / Tracker'])}`,`Module Support Plates / Side = ${n(row['Module Support Plates / Side'])}`);
   return E.displayTerminology(lines.join('\n'));
 }
 function renderLogic(){
