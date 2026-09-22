@@ -168,7 +168,8 @@ test('quotation reads the complete parameterized LaTeX template and safely conne
   assert.match(html,/quotation-latex\.js\?v=20260908-location-limit/);
   assert.match(html,/quotation\/compilers\/quotation-compiler\.js/);
   assert.match(html,/quotation\/compilers\/swiftlatex-compiler\.js/);
-  assert.match(html,/quotation-renderer\.js\?v=20260908-location-limit/);
+  assert.match(html,/quotation-renderer\.js\?v=20260922-v4-11/);
+  assert.match(renderer,/>Save Database<\/button>/);
   assert.doesNotMatch(styles,/\.quotation-page\b|\.docx-wrapper/);
   assert.match(styles,/\.quotation-pdf-frame/);
   assert.match(styles,/\.quotation-field\s*\{[^}]*gap:\s*8px/s);

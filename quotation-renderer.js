@@ -291,7 +291,7 @@
   async function saveSnapshot(root) {
     updateProjectFromForm(root);
     const model = currentModel();
-    if (!model.quotationNumber) { alert('Quotation Number is required before saving a snapshot.'); return; }
+    if (!model.quotationNumber) { alert('Quotation Number is required before saving to the database.'); return; }
     try {
       const {error} = await global.LumaSupabase.getClient().from('quotations').insert({
         quotation_number:model.quotationNumber, revision:model.quotationVersion,
@@ -300,10 +300,10 @@
         total_amount:model.quotationTotal, snapshot:model,
       });
       if (error) throw error;
-      alert('Quotation snapshot saved.');
+      alert('Quotation saved to the database.');
     } catch (error) {
       console.error('Quotation snapshot save failed.', {code:error?.code});
-      alert(error?.code === '23505' ? 'This quotation number and revision already exist.' : 'The quotation snapshot could not be saved.');
+      alert(error?.code === '23505' ? 'This quotation number and revision already exist.' : 'The quotation could not be saved to the database.');
     }
   }
 
@@ -333,7 +333,7 @@
         <div class="quotation-actions">
           <button type="button" data-quotation-action="refresh">Refresh Quotation</button>
           <button type="button" data-quotation-action="download">Save PDF</button>
-          <button type="button" data-quotation-action="snapshot">Save Snapshot</button>
+          <button type="button" data-quotation-action="snapshot">Save Database</button>
         </div>
         <p class="quotation-status loading" data-quotation-status role="status" aria-live="polite">Loading LaTeX quotation template...</p>
         <div class="quotation-progress" data-quotation-progress hidden>

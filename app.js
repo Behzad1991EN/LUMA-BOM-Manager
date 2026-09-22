@@ -2,7 +2,7 @@
 
 const E = LumaEngine;
 const APP_NAME = 'LUMA BOM Manager';
-const APP_VERSION = 'Version 4.10';
+const APP_VERSION = 'Version 4.11';
 const APP_RELEASE_DATE = '22.09.2026';
 const APP_AUTHOR = 'Behzad Eydiyoon';
 const WORKSPACE_FORMAT_VERSION = '1.0';
@@ -155,9 +155,13 @@ const CHANGELOG = {
     'Added Tracker Sketch checks for Hat Rails within 50 mm of Torque Tube overlaps or 100 mm of Bearing Piles, with affected rails identified and highlighted',
     'Added live 400 mm and 790 mm Module Rail compatibility status beside the longitudinal hole-distance inputs and refined the input status layout',
     'Added simple borders to every filled cell in exported Excel workbooks'
+  ],
+  '4.11': [
+    'Added Reset beside Max Span Length in CAD Availability = No mode to restore the default 7,900 mm span',
+    'Renamed the Quotation Save Snapshot button to Save Database'
   ]
 };
-const CHANGELOG_DATES = {'1.00':'26.05.2026','2.00':'08.06.2026','2.10':'16.06.2026','2.20':'17.06.2026','3.00':'08.07.2026','3.10':'22.07.2026','3.11':'27.07.2026','3.20':'18.08.2026','3.30':'19.08.2026','3.40':'20.08.2026','3.41':'24.08.2026','3.42':'25.08.2026','3.43':'25.08.2026','4.00':'17.09.2026','4.10':'22.09.2026'};
+const CHANGELOG_DATES = {'1.00':'26.05.2026','2.00':'08.06.2026','2.10':'16.06.2026','2.20':'17.06.2026','3.00':'08.07.2026','3.10':'22.07.2026','3.11':'27.07.2026','3.20':'18.08.2026','3.30':'19.08.2026','3.40':'20.08.2026','3.41':'24.08.2026','3.42':'25.08.2026','3.43':'25.08.2026','4.00':'17.09.2026','4.10':'22.09.2026','4.11':'22.09.2026'};
 const USER_MANUAL_URL = 'https://ksisolar.sharepoint.com/:b:/s/Engineering/IQA8CGStyAACQ7K8hFJe4jJ6Ad-f3cKvwnyZnM2lhb7yq0I?e=L8zsa5';
 
 let workspace = null;
@@ -670,8 +674,9 @@ function renderBearingConfig(){
     document.getElementById('crDelete').addEventListener('click',()=>{if(!customRuleSelectedKey){showToast('Select a custom bearing configuration from the table first.');return;}const selected=parseBearingConfigurationSelectionKey(customRuleSelectedKey),variants=E.getBearingRuleVariantsForPv(p,selected.pv),removed=variants.find(rule=>rule.key===selected.key);if(!removed){showToast('The selected configuration is no longer available.');return;}if(!confirm(`Delete the ${removed.mode} configuration for ${selected.pv}-PV?`))return;const remaining=variants.filter(rule=>rule.key!==selected.key);if(remaining.length){p.bearing_rules[String(selected.pv)]=bearingRuleStoreFromVariants(remaining);updateTrackerQuantityFromBearingRules(p,selected.pv);}else{delete p.bearing_rules[String(selected.pv)];p.tracker_quantities[String(selected.pv)]=removed.quantity;}customRuleSelectedKey=null;syncCustomRuleFromProject(selected.pv,removed.mode);markDirty();refreshOutputsOnly();renderBearingConfig();});
     renderBearingSummaryOnly();
   }else{
-    const maxSpan=iValue('max_span_length',p.inputs.max_span_length);const limits=E.getSpanLimits(p);root.innerHTML=`<div class="bearing-top"><label>Array Type</label><select disabled><option>${escapeHtml(uiState.customRule.pv)}</option></select><label>Mode</label><strong>Symmetrical</strong><label>Max Span Length (mm)</label><input id="estMaxSpan" value="${escapeHtml(maxSpan)}"></div><p class="subtitle">Estimation mode: span means the distance between two bearing piles. Tracker span type is selected from total tracker length.</p><div class="table-wrap framed"><table><thead><tr><th>Tracker Type</th><th>Max Tracker Length (mm)</th><th>Bearing Piles</th></tr></thead><tbody>${[2,4,6,8].map(s=>`<tr><td>${s}-Span</td><td>${escapeHtml(E.niceNumber(limits[s]))}</td><td>${s} Bearing Piles</td></tr>`).join('')}</tbody></table></div><div id="bearingSummary"></div>`;
-    document.getElementById('estMaxSpan').addEventListener('input',e=>{p.inputs.max_span_length=e.target.value;markDirty();refreshOutputsOnly();renderBearingSummaryOnly();});renderBearingSummaryOnly();
+    const maxSpan=iValue('max_span_length',p.inputs.max_span_length);const limits=E.getSpanLimits(p);root.innerHTML=`<div class="bearing-top"><label>Array Type</label><select disabled><option>${escapeHtml(uiState.customRule.pv)}</option></select><label>Mode</label><strong>Symmetrical</strong><label for="estMaxSpan">Max Span Length (mm)</label><span class="bearing-span-control"><input id="estMaxSpan" value="${escapeHtml(maxSpan)}"><button type="button" id="estMaxSpanReset" title="Reset to ${escapeHtml(E.DEFAULT_INPUTS.max_span_length)} mm">Reset</button></span></div><p class="subtitle">Estimation mode: span means the distance between two bearing piles. Tracker span type is selected from total tracker length.</p><div class="table-wrap framed"><table><thead><tr><th>Tracker Type</th><th>Max Tracker Length (mm)</th><th>Bearing Piles</th></tr></thead><tbody>${[2,4,6,8].map(s=>`<tr><td>${s}-Span</td><td>${escapeHtml(E.niceNumber(limits[s]))}</td><td>${s} Bearing Piles</td></tr>`).join('')}</tbody></table></div><div id="bearingSummary"></div>`;
+    document.getElementById('estMaxSpan').addEventListener('input',e=>{p.inputs.max_span_length=e.target.value;markDirty();refreshOutputsOnly();renderBearingSummaryOnly();});
+    document.getElementById('estMaxSpanReset').addEventListener('click',()=>{p.inputs.max_span_length=E.DEFAULT_INPUTS.max_span_length;markDirty();refreshOutputsOnly();renderBearingConfig();});renderBearingSummaryOnly();
   }
 }
 function iValue(_key,value){return value==null?'':String(value);}

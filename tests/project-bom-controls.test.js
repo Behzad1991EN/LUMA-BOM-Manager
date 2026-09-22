@@ -64,6 +64,18 @@ test('Project BOM selected rows match the VEON highlighted and keyboard-accessib
 test('browser assets share the current release cache token', () => {
   const html = read('index.html');
   for (const asset of ['style.css', 'engine.js', 'app.js']) {
-    assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=20260922-v4-10`));
+    assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=20260922-v4-11`));
   }
+});
+
+test('estimation-mode Reset restores the default Max Span Length', () => {
+  const engine = loadEngine();
+  const app = read('app.js');
+  assert.equal(engine.DEFAULT_INPUTS.max_span_length, '7900');
+  assert.match(app, /id="estMaxSpanReset"/);
+  assert.match(app, /p\.inputs\.max_span_length=E\.DEFAULT_INPUTS\.max_span_length;markDirty\(\);refreshOutputsOnly\(\);renderBearingConfig\(\)/);
+  const project = {inputs:{cad_blocks_available:'No',max_span_length:'9000'}};
+  assert.equal(engine.getSpanLimits(project)[2], 24300);
+  project.inputs.max_span_length = engine.DEFAULT_INPUTS.max_span_length;
+  assert.equal(engine.getSpanLimits(project)[2], 21330);
 });

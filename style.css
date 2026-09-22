@@ -2089,6 +2089,12 @@ textarea:focus {
     width: 135px;
 }
 
+.bearing-span-control {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .bearing-editor {
     margin: 8px 0 10px;
 }
