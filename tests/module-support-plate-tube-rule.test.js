@@ -53,6 +53,19 @@ test('outside rails receive no assumed plate and BOM multiplies the per-tracker 
   assert.match(definition[4],/3 plates on 100 × 100 Torque Tube/);
 });
 
+test('Tracker Sketch displays the authoritative support-plate quantity without adding an extra Z-rail plate',()=>{
+  const app=fs.readFileSync(path.join(root,'app.js'),'utf8');
+  const start=app.indexOf('function trackerSketchSupportPlateQuantity(');
+  const end=app.indexOf('\nfunction svgEsc(',start);
+  const context={E:loadEngine(),Math};
+  vm.createContext(context);
+  vm.runInContext(`${app.slice(start,end)};this.quantity=trackerSketchSupportPlateQuantity;`,context);
+  assert.equal(context.quantity({'Rail Type':'Z Rail','Beam Zone':'A / 120','Final Plates / Rail / Side':1}),1);
+  assert.equal(context.quantity({'Rail Type':'Z Rail','Beam Zone':'C / 100','Final Plates / Rail / Side':3}),3);
+  assert.equal(context.quantity({'Rail Type':'Z Rail','Beam Zone':'C / 100','Final Plates / Rail / Side':4}),3);
+  assert.equal(context.quantity({'Rail Type':'Hat Rail','Beam Zone':'B / 110','Final Plates / Rail / Side':2}),2);
+});
+
 test('the new Part Master migration records the same rule for K001099',()=>{
   const migration=fs.readFileSync(path.join(root,'supabase','migrations','20260922002400_update_module_rail_support_plate_note.sql'),'utf8');
   assert.match(migration,/where lower\(btrim\(tag\)\) = 'k001099'/);

@@ -32,6 +32,8 @@
   const MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM = Object.freeze([400,790]);
   const HAT_RAIL_OVERLAP_MIN_CLEARANCE_MM = 50;
   const HAT_RAIL_BEARING_PILE_MIN_CLEARANCE_MM = 100;
+  const STANDARD_SPAN_LENGTH_MIN_MM = 5000;
+  const STANDARD_SPAN_LENGTH_MAX_MM = 9000;
 
   function normalizeText(value){
     return String(value ?? '').trim().toLowerCase().replaceAll('×','x').replace(/[^a-z0-9]+/g,'');
@@ -65,6 +67,10 @@
   }
   function ceilHalf(value){ return Math.floor((asInt(value,0) + 1) / 2); }
   function ceilUp(value){ return Math.ceil(asNumber(value,0)); }
+  function roundUpToTenMm(value){
+    const length=Math.max(0,asNumber(value,0));
+    return Math.ceil(length/10)*10;
+  }
 
   const FASTENER_STANDARDS = [
     ['din931iso4014','Standard Hex Bolt'],
@@ -130,6 +136,7 @@
     elevation_asl:'0',
     final_layout_document_number:'',
     pv_module_datasheet_document_number:'',
+    cad_block_document_number:'',
     cad_blocks_available:'Yes',
     max_span_length:'7900',
     pv_module_width:'1134',
@@ -156,13 +163,15 @@
     symmetrical_distance:'8320',
     semi_pair_count:3,
     asym_post_count:3,
+    asym_north_post_count:3,
+    asym_south_post_count:3,
     semi_pair_gaps:{'1':'8320','2':'7350','3':'6500','4':'','5':''},
     asym_north_gaps:{'1':'8320','2':'7350','3':'6500','4':'','5':''},
     asym_south_gaps:{'1':'8320','2':'7350','3':'6500','4':'','5':''},
   });
 
   function defaultTrackerQuantities(){
-    return Object.fromEntries(Array.from({length:43},(_,i)=>[String(i+14),0]));
+    return Object.fromEntries(Array.from({length:45},(_,i)=>[String(i+12),0]));
   }
   function defaultManualParts(){
     return {
@@ -172,30 +181,45 @@
   }
   function defaultBearingRule(inputs=DEFAULT_INPUTS){
     const semiCount = asInt(inputs.semi_pair_count,3);
-    const asymCount = asInt(inputs.asym_post_count,3);
+    const legacyAsymCount = asInt(inputs.asym_post_count,3);
+    const asymNorthCount = Math.max(0,Math.min(5,asInt(inputs.asym_north_post_count,legacyAsymCount)));
+    const asymSouthCount = Math.max(0,Math.min(5,asInt(inputs.asym_south_post_count,legacyAsymCount)));
     return {
       locked:false,
       mode:String(inputs.bearing_distance_mode || 'Symmetrical'),
+      motor_gap_override_enabled:false,
+      motor_gap:asNumber(inputs.motor_gap,400),
       symmetrical_distance:asNumber(inputs.symmetrical_distance,8320),
       semi_pair_count:semiCount,
-      asym_post_count:asymCount,
+      asym_post_count:Math.max(asymNorthCount,asymSouthCount),
+      asym_north_post_count:asymNorthCount,
+      asym_south_post_count:asymSouthCount,
       semi_pair_gaps:Array.from({length:semiCount},(_,i)=>asNumber(inputs.semi_pair_gaps?.[String(i+1)],0)),
-      asym_north_gaps:Array.from({length:asymCount},(_,i)=>asNumber(inputs.asym_north_gaps?.[String(i+1)],0)),
-      asym_south_gaps:Array.from({length:asymCount},(_,i)=>asNumber(inputs.asym_south_gaps?.[String(i+1)],0)),
+      asym_north_gaps:Array.from({length:asymNorthCount},(_,i)=>asNumber(inputs.asym_north_gaps?.[String(i+1)],0)),
+      asym_south_gaps:Array.from({length:asymSouthCount},(_,i)=>asNumber(inputs.asym_south_gaps?.[String(i+1)],0)),
     };
   }
   function normalizeBearingRule(rule){
     const r = rule || {};
+    const legacyAsymCount=Math.max(0,Math.min(5,asInt(r.asym_post_count,Math.max((r.asym_north_gaps||[]).length,(r.asym_south_gaps||[]).length))));
+    const inferredLegacyCount=gaps=>{const values=Array.from(gaps||[]).slice(0,legacyAsymCount);for(let index=values.length-1;index>=0;index--)if(asNumber(values[index],0)>0)return index+1;return values.length?0:legacyAsymCount;};
+    const northFallback=inferredLegacyCount(r.asym_north_gaps),southFallback=inferredLegacyCount(r.asym_south_gaps);
+    const asymNorthCount=Math.max(0,Math.min(5,asInt(r.asym_north_post_count,northFallback)));
+    const asymSouthCount=Math.max(0,Math.min(5,asInt(r.asym_south_post_count,southFallback)));
     return {
       locked:!!r.locked,
       mode:normalizeBearingMode(r.mode),
       quantity:Math.max(0,asInt(r.quantity,0)),
+      motor_gap_override_enabled:r.motor_gap_override_enabled===true,
+      motor_gap:Math.max(0,asNumber(r.motor_gap,0)),
       symmetrical_distance:asNumber(r.symmetrical_distance,0),
       semi_pair_count:asInt(r.semi_pair_count,(r.semi_pair_gaps||[]).length),
-      asym_post_count:asInt(r.asym_post_count,(r.asym_north_gaps||[]).length),
+      asym_post_count:Math.max(asymNorthCount,asymSouthCount),
+      asym_north_post_count:asymNorthCount,
+      asym_south_post_count:asymSouthCount,
       semi_pair_gaps:Array.from(r.semi_pair_gaps || [],v=>asNumber(v,0)),
-      asym_north_gaps:Array.from(r.asym_north_gaps || [],v=>asNumber(v,0)),
-      asym_south_gaps:Array.from(r.asym_south_gaps || [],v=>asNumber(v,0)),
+      asym_north_gaps:Array.from(r.asym_north_gaps || [],v=>asNumber(v,0)).slice(0,asymNorthCount),
+      asym_south_gaps:Array.from(r.asym_south_gaps || [],v=>asNumber(v,0)).slice(0,asymSouthCount),
     };
   }
   const BEARING_RULE_MODES=Object.freeze(['Symmetrical','Semi-symmetrical','Asymmetrical']);
@@ -267,18 +291,27 @@
   }
   function cadBlocksAreAvailable(project){ return String(project.inputs?.cad_blocks_available ?? 'Yes').trim().toLowerCase() === 'yes'; }
   function getBomModeText(project){ return cadBlocksAreAvailable(project) ? 'CAD Block' : 'Estimation'; }
+  function getSpanLengthStatus(project){
+    const raw=project?.inputs?.max_span_length;
+    const entered=raw!==null&&raw!==undefined&&String(raw).trim()!==''&&Number.isFinite(Number(raw));
+    const value=entered?Number(raw):asNumber(DEFAULT_INPUTS.max_span_length,7900);
+    return {value,standard:entered&&value>=STANDARD_SPAN_LENGTH_MIN_MM&&value<=STANDARD_SPAN_LENGTH_MAX_MM,min:STANDARD_SPAN_LENGTH_MIN_MM,max:STANDARD_SPAN_LENGTH_MAX_MM};
+  }
   function getSpanLimits(project){
-    const maxSpan = asNumber(project.inputs?.max_span_length,7900);
+    const maxSpan = getSpanLengthStatus(project).value;
     return Object.fromEntries([2,4,6,8].map(span=>[span,span*maxSpan + 2*maxSpan*0.35]));
   }
   function estimateSpanCountForLength(project,trackerLength){
-    const limits = getSpanLimits(project);
-    for(const span of [2,4,6,8]){ if(trackerLength <= limits[span]) return span; }
-    return 8;
+    const maxSpan=getSpanLengthStatus(project).value,length=asNumber(trackerLength,0);
+    if(maxSpan<=0||length<=0)return 0;
+    const minimumCount=Math.max(2,Math.ceil((length-.7*maxSpan)/maxSpan-1e-9));
+    return minimumCount%2===0?minimumCount:minimumCount+1;
   }
 
-  function calculateTrackerGeometry(project,pvCount){
-    const d = getDesignInputs(project);
+  function calculateTrackerGeometry(project,pvCount,ruleOverride=null){
+    const baseInputs=getDesignInputs(project);
+    const hasMotorGapOverride=ruleOverride?.motor_gap_override_enabled===true&&Number.isFinite(Number(ruleOverride?.motor_gap))&&Number(ruleOverride.motor_gap)>=0;
+    const d={...baseInputs,motor_gap:hasMotorGapOverride?Number(ruleOverride.motor_gap):baseInputs.motor_gap};
     const northModules = Math.ceil(pvCount/2);
     const southModules = Math.floor(pvCount/2);
     const isOddTracker = pvCount % 2 === 1;
@@ -309,12 +342,18 @@
     }
     const north = sideGeometry(northModules);
     const south = sideGeometry(southModules);
+    const exactCutLength=isOddTracker?`N:${niceNumber(north.main_c_required)} / S:${niceNumber(south.main_c_required)}`:north.main_c_required;
+    const roundedCutLength=isOddTracker?`N:${roundUpToTenMm(north.main_c_required)} / S:${roundUpToTenMm(south.main_c_required)}`:roundUpToTenMm(north.main_c_required);
+    const stockSuggestion=isOddTracker?`N:${north.stock} / S:${south.stock}`:north.stock;
     const trackerLength = cadBlocksAreAvailable(project) ? north.end + south.end : north.required + south.required;
     return {
       'Tracker Type':trackerType,
       'Tracker Symmetry':isOddTracker?'Asymmetrical':'Symmetrical',
+      'Motor Gap (mm)':d.motor_gap,
+      'Motor Gap Source':hasMotorGapOverride?'Array Override':'Project Input',
       'First Piece Name':firstPieceName,
       'First Piece Length':firstPieceLength,
+      'Torque Tube B Length (mm)':d.main_beam_b_length,
       'Modules / Side':isOddTracker?`N:${northModules} / S:${southModules}`:northModules,
       'Modules / North Side':northModules,
       'Modules / South Side':southModules,
@@ -334,10 +373,15 @@
       'B/C Overlap End from Midplane':zoneBEnd,
       'Base Until C':baseUntilC,
       'Main Tube C Start from Midplane':baseUntilC,
-      'Main Tube C Required Length':isOddTracker?`N:${niceNumber(north.main_c_required)} / S:${niceNumber(south.main_c_required)}`:north.main_c_required,
+      'Main Tube C Required Length':exactCutLength,
       'Main Tube C Required Length North':north.main_c_required,
       'Main Tube C Required Length South':south.main_c_required,
-      'Main Tube C Stock Suggestion':isOddTracker?`N:${north.stock} / S:${south.stock}`:north.stock,
+      'Torque Tube C Exact Cut Length (mm)':exactCutLength,
+      'Torque Tube C Rounded Cut Length (mm)':roundedCutLength,
+      'Torque Tube C Rounded Cut Length North (mm)':roundUpToTenMm(north.main_c_required),
+      'Torque Tube C Rounded Cut Length South (mm)':roundUpToTenMm(south.main_c_required),
+      'Torque Tube C Stock Suggestion':stockSuggestion,
+      'Main Tube C Stock Suggestion':stockSuggestion,
       'Main Tube C Stock Suggestion North':north.stock,
       'Main Tube C Stock Suggestion South':south.stock,
       'Main Tube C Stock Length North':north.stock_length,
@@ -389,17 +433,10 @@
         rows.push({'Pair No.':pair,'Side':'South','Gap from Previous (mm)':gap,'Distance from Main Post (mm)':-cumulative});
       });
     } else {
-      const northGaps=rule.asym_north_gaps||[], southGaps=rule.asym_south_gaps||[];
-      const count=Math.max(northGaps.length,southGaps.length);
+      const northGaps=(rule.asym_north_gaps||[]).slice(0,rule.asym_north_post_count),southGaps=(rule.asym_south_gaps||[]).slice(0,rule.asym_south_post_count);
       let northCumulative=0,southCumulative=0;
-      for(let index=0;index<count;index++){
-        const northGap=asNumber(northGaps[index],0), southGap=asNumber(southGaps[index],0);
-        northCumulative+=northGap; southCumulative+=southGap;
-        const pair=index+1;
-        // Current logic emits both sides even when a gap is 0.
-        rows.push({'Pair No.':pair,'Side':'North','Gap from Previous (mm)':northGap,'Distance from Main Post (mm)':northCumulative});
-        rows.push({'Pair No.':pair,'Side':'South','Gap from Previous (mm)':southGap,'Distance from Main Post (mm)':-southCumulative});
-      }
+      northGaps.forEach((rawGap,index)=>{const gap=asNumber(rawGap,0);if(gap<=0)return;northCumulative+=gap;rows.push({'Pair No.':index+1,'Side':'North','Gap from Previous (mm)':gap,'Distance from Main Post (mm)':northCumulative});});
+      southGaps.forEach((rawGap,index)=>{const gap=asNumber(rawGap,0);if(gap<=0)return;southCumulative+=gap;rows.push({'Pair No.':index+1,'Side':'South','Gap from Previous (mm)':gap,'Distance from Main Post (mm)':-southCumulative});});
     }
     return rows;
   }
@@ -425,10 +462,10 @@
   }
   function calculateEstimatedBearingPositions(project,geometry){
     const trackerLength=asNumber(geometry['Tracker Length (mm)'],0);
-    const maxSpan=asNumber(project.inputs?.max_span_length,7900);
+    const maxSpan=getSpanLengthStatus(project).value;
     const spanCount=estimateSpanCountForLength(project,trackerLength);
-    const pairsPerSide=Math.max(Math.trunc(spanCount/2),1);
-    const spanType=`${spanCount}-Span`;
+    const pairsPerSide=spanCount>0?Math.trunc(spanCount/2):0;
+    const spanType=spanCount>0?`${spanCount}-Span`:'Not calculated';
     const rows=[];
     for(let pair=1;pair<=pairsPerSide;pair++){
       const distance=pair*maxSpan;
@@ -457,11 +494,12 @@
       if(bearingType==='Bearing 120') bearing120++; else if(bearingType==='Bearing 110') bearing110++; else if(bearingType==='Bearing 100') bearing100++; else outside++;
       return {...item,'Absolute Distance (mm)':Math.abs(item['Distance from Main Post (mm)']),'Beam Zone':zone,'Bearing Type':bearingType,'Status':status,'Bearing Rule Source':bearingRuleSource,'Bearing Rule Mode':bearingRuleMode,'Span Type':spanType};
     });
-    return {'Bearing Posts / Tracker':outputRows.length,'Bearing 120 / Tracker':bearing120,'Bearing 110 / Tracker':bearing110,'Bearing 100 / Tracker':bearing100,'Bearing Outside / Tracker':outside,'Bearing Status':outside===0?'OK':'Warning','Bearing Rule Source':bearingRuleSource,'Bearing Rule Mode':bearingRuleMode,'Span Type':spanType,'Estimated Span Count':spanCount,'Rows':outputRows};
+    const standardSpan=cadBlocksAreAvailable(project)||getSpanLengthStatus(project).standard;
+    return {'Bearing Posts / Tracker':outputRows.length,'Bearing 120 / Tracker':bearing120,'Bearing 110 / Tracker':bearing110,'Bearing 100 / Tracker':bearing100,'Bearing Outside / Tracker':outside,'Bearing Status':outside?'Warning':(standardSpan?'OK':'NON-Standard Configuration'),'Bearing Rule Source':bearingRuleSource,'Bearing Rule Mode':bearingRuleMode,'Span Type':spanType,'Estimated Span Count':spanCount,'Rows':outputRows};
   }
 
   function generateModuleRailPositionsForSide(project,pvCount,geometry,side){
-    const d=getDesignInputs(project);
+    const baseInputs=getDesignInputs(project),d={...baseInputs,motor_gap:asNumber(geometry?.['Motor Gap (mm)'],baseInputs.motor_gap)};
     const sideName=String(side).toLowerCase().startsWith('n')?'North':'South';
     const sign=sideName==='North'?1:-1;
     const modulesPerSide=asInt(geometry[`Modules / ${sideName} Side`],sideName==='North'?Math.ceil(pvCount/2):Math.floor(pvCount/2));
@@ -649,11 +687,11 @@
   function buildSchedule(project){
     const d=getDesignInputs(project);
     const rows=[];
-    for(let pvCount=14;pvCount<=56;pvCount++){
-      const geometry=calculateTrackerGeometry(project,pvCount);
+    for(let pvCount=12;pvCount<=56;pvCount++){
       const variants=cadBlocksAreAvailable(project)?getBearingRuleVariantsForPv(project,pvCount):[];
       const configurations=variants.length?variants.map(rule=>({rule,quantity:rule.quantity,key:rule.key,source:'Custom'})):[{rule:null,quantity:asInt(project.tracker_quantities?.[String(pvCount)],0),key:'default',source:cadBlocksAreAvailable(project)?'Default':'Estimation'}];
       configurations.forEach(configuration=>{
+        const geometry=calculateTrackerGeometry(project,pvCount,configuration.rule);
         const trackerQty=Math.max(0,asInt(configuration.quantity,0));
         const scheduleKey=`${pvCount}:${configuration.key}`;
         const row={...geometry,'PV Modules per Tracker':pvCount,'Number of Trackers':trackerQty,'PV Modules Total':pvCount*trackerQty,'Estimated Power (MWp)':pvCount*trackerQty*d.pv_power/1000000,'_bearing_rule_key':configuration.key==='default'?'':configuration.key,'_schedule_key':scheduleKey};
@@ -721,6 +759,11 @@
   function itemIsFastener(calculatedItem,categoryFallback){
     const text=`${calculatedItem} ${categoryFallback}`.toLowerCase();
     return text.includes('fastener') || (` ${text} `).includes(' din ') || text.includes('iso') || text.includes('bolt') || text.includes('nut') || text.includes('washer') || text.includes('screw');
+  }
+  function itemIsPile(calculatedItem,categoryFallback=''){
+    const normalizedItem=normalizeText(calculatedItem),normalizedCategory=normalizeText(categoryFallback);
+    return ['drivepile','mainpost','bearingpile','bearingpost'].includes(normalizedItem)
+      || (normalizedCategory.includes('steelstructurepost')&&(normalizedItem.includes('pile')||normalizedItem.includes('post')));
   }
   function recordIsValidForCalculatedItem(record,calculatedItem,categoryFallback){
     const normalizedItem=normalizeText(calculatedItem),normalizedRecord=normalizeText(partMasterRecordText(record));
@@ -839,7 +882,7 @@
     if(part) return `part:${part}`;
     return `description:${normalizeText(record?.Description)}`;
   }
-  function normalizeSoltrkVersion(value){ return String(value||'2.0').trim()==='3.0'?'3.0':'2.0'; }
+  function normalizeSoltrkVersion(value){ return String(value??'3.0').trim()==='2.0'?'2.0':'3.0'; }
   function scheduleRowIdentity(row){return String(row?._schedule_key||`${asInt(row?.['PV Modules per Tracker'],0)}:default`);}
   function torqueTubeJointCountForRow(row){
     // Each tracker has one inner joint on each side: A–B for long trackers,
@@ -923,7 +966,7 @@
     // Previous K001099 / PLUSS00173BZ00 calculation (kept for future restoration):
     // ['Module Rail Support Plate',r=>asInt(r['Module Support Plates / Tracker'])*asInt(r['Number of Trackers']),['k001099','module support plate','support plate','module rail support plate'],'Module Rails / Support','Existing formula kept: rail-by-rail bearing influence, taper, and main tube height compensation'],
     ['Module Rail Support Plate',r=>asInt(r['Module Support Plates / Tracker'])*asInt(r['Number of Trackers']),['k001099','module support plate','support plate','module rail support plate'],'Module Rails / Support','Per module rail (Hat or Z): 3 plates on 100 × 100 Torque Tube, 2 on 110 × 110, 1 on 120 × 120; sum per tracker'],
-    ['Module Rail Elevation Plate',r=>2*asInt(r['Bearing 100 / Tracker'])*asInt(r['Number of Trackers']),['k001573','module elevation plate','elevation plate','module rail elevation plate'],'Module Rails / Support','2 × Bearing 100'],
+    ['Module Rail Elevation Plate',(r,c)=>c.moduleRailElevationPlateIncluded?2*asInt(r['Bearing 100 / Tracker'])*asInt(r['Number of Trackers']):0,['k001573','module elevation plate','elevation plate','module rail elevation plate'],'Module Rails / Support','Optional; when included: 2 × Bearing 100'],
     ['Limit Switch Holder',r=>asInt(r['Number of Trackers']),['limit switch holder'],'Steel Structure','Main Post'],
     ['Limit Switch Trigger',r=>asInt(r['Number of Trackers']),['limit switch trigger','limit switch frame'],'Steel Structure','Main Post'],
     ['SOLTRK Holder / External Plate',(r,c)=>contextEquipmentQty(c,'soltrk',r),c=>c.soltrkVersion==='3.0'?['k001568']:['k001505'],'Steel Structure / Substructure','1 × SOLTRK'],
@@ -997,8 +1040,11 @@
     const displayBaseColumns=baseColumns.map(col=>col==='Part'?'Part Name':col);
     const contingencyEnabled=project?.contingency_enabled===true;
     const contingencyPercent=Math.min(100,Math.max(0,asNumber(project?.fastener_contingency_percent,0)));
+    const pileContingencyEnabled=project?.pile_contingency_enabled===true;
+    const pileContingencyPercent=Math.min(100,Math.max(0,asNumber(project?.pile_contingency_percent,0)));
+    const anyContingencyEnabled=contingencyEnabled||pileContingencyEnabled;
     const metadataEnabled=project?.bom_metadata_enabled!==false;
-    const columns=['No.',...displayBaseColumns,...(metadataEnabled?['Material','Weight']:[]),...qtyColumns,'Total Qty',...(contingencyEnabled?['Contingency (%)']:[])];
+    const columns=['No.',...displayBaseColumns,...(metadataEnabled?['Material','Weight']:[]),...qtyColumns,'Total Qty',...(anyContingencyEnabled?['Contingency (%)']:[])];
     const previewColumns=['No.',...displayBaseColumns,'Calculation Note'];
     const rows=[];
     const errors=[];
@@ -1006,6 +1052,7 @@
     const equipmentAllocation=equipmentQuantityAllocation(project,selectedRows);
     const bomContext={
       soltrkVersion:normalizeSoltrkVersion(project?.soltrk_version),
+      moduleRailElevationPlateIncluded:project?.module_rail_elevation_plate_included===true,
       anemometer:getAnemometerSelection(project),
       soltrkByPv:equipmentAllocation.soltrkByPv,
       junctionBoxByPv:equipmentAllocation.junctionBoxByPv,
@@ -1088,11 +1135,12 @@
     }
     rows.forEach((row,index)=>{
       row['No.']=index+1;
-      if(contingencyEnabled){
-        const isFastener=recordIsFastener(row);
-        row['Contingency (%)']=isFastener?niceNumber(contingencyPercent):0;
-        if(isFastener && contingencyPercent>0){
-          const adjustedTotal=asNumber(row['Total Qty'],0)*(1+contingencyPercent/100);
+      if(anyContingencyEnabled){
+        const isFastener=recordIsFastener(row),isPile=itemIsPile(row['Part Name']??row.Part,row.Category);
+        const appliedPercent=isFastener&&contingencyEnabled?contingencyPercent:(isPile&&pileContingencyEnabled?pileContingencyPercent:0);
+        row['Contingency (%)']=niceNumber(appliedPercent);
+        if(appliedPercent>0){
+          const adjustedTotal=asNumber(row['Total Qty'],0)*(1+appliedPercent/100);
           const floatingPointTolerance=Number.EPSILON*Math.max(1,Math.abs(adjustedTotal))*4;
           row['Total Qty']=Math.ceil(adjustedTotal-floatingPointTolerance);
         }
@@ -1126,12 +1174,12 @@
   }
 
   global.LumaEngine={
-    PART_COLUMNS,DEFAULT_INPUTS,BOM_DEFINITIONS,BOM_DEFAULT_METADATA,ANEMOMETER_ELEVATION_THRESHOLD_M,ANEMOMETER_OPTIONS,PLANT_ELECTRICAL_ITEMS,MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM,HAT_RAIL_OVERLAP_MIN_CLEARANCE_MM,HAT_RAIL_BEARING_PILE_MIN_CLEARANCE_MM,
-    normalizeText,displayTerminology,asNumber,asInt,niceNumber,firstNonEmpty,ceilHalf,ceilUp,
+    PART_COLUMNS,DEFAULT_INPUTS,BOM_DEFINITIONS,BOM_DEFAULT_METADATA,ANEMOMETER_ELEVATION_THRESHOLD_M,ANEMOMETER_OPTIONS,PLANT_ELECTRICAL_ITEMS,MODULE_RAIL_COMPATIBLE_LONGITUDINAL_DISTANCES_MM,HAT_RAIL_OVERLAP_MIN_CLEARANCE_MM,HAT_RAIL_BEARING_PILE_MIN_CLEARANCE_MM,STANDARD_SPAN_LENGTH_MIN_MM,STANDARD_SPAN_LENGTH_MAX_MM,
+    normalizeText,displayTerminology,asNumber,asInt,niceNumber,firstNonEmpty,ceilHalf,ceilUp,roundUpToTenMm,
     fastenerPartNameFromDescription,normalizePartMasterData,defaultTrackerQuantities,defaultManualParts,defaultBearingRule,normalizeBearingRule,BEARING_RULE_MODES,normalizeBearingMode,bearingRuleVariantKey,normalizeBearingRuleVariants,
-    getDesignInputs,calculateAutoPvModuleGap,moduleRailCompatibility,getAnemometerSelection,cadBlocksAreAvailable,getBomModeText,getSpanLimits,estimateSpanCountForLength,
+    getDesignInputs,calculateAutoPvModuleGap,moduleRailCompatibility,getAnemometerSelection,cadBlocksAreAvailable,getBomModeText,getSpanLengthStatus,getSpanLimits,estimateSpanCountForLength,
     calculateTrackerGeometry,getBearingRuleVariantsForPv,getBearingRuleForPv,getPositionsFromRule,classifyBearing,classifyBeamZoneForPosition,calculateEstimatedBearingPositions,calculateBearingLayoutForTracker,
     generateModuleRailPositionsForSide,clearanceFromInterval,torqueTubeOverlapZonesForSide,calculateHatRailInstallationClearances,closestRailIndicesAroundPosition,calculateModuleSupportPlatesForTracker,buildSchedule,buildBearingLayoutTable,buildModuleSupportLayoutTable,
-    recordIsFastener,itemIsFastener,recordIsValidForCalculatedItem,findPartMasterMatch,bomRowKey,normalizeSoltrkVersion,scheduleRowIdentity,torqueTubeJointCountForRow,equipmentQuantityAllocation,buildProjectBom,buildPartMasterPreview,calculateProject,
+    recordIsFastener,itemIsFastener,itemIsPile,recordIsValidForCalculatedItem,findPartMasterMatch,bomRowKey,normalizeSoltrkVersion,scheduleRowIdentity,torqueTubeJointCountForRow,equipmentQuantityAllocation,buildProjectBom,buildPartMasterPreview,calculateProject,
   };
 })(globalThis);

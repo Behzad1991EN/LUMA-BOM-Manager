@@ -64,7 +64,7 @@ test('Project BOM selected rows match the VEON highlighted and keyboard-accessib
 test('browser assets share the current release cache token', () => {
   const html = read('index.html');
   for (const asset of ['style.css', 'engine.js', 'app.js']) {
-    assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=20260922-v4-11`));
+    assert.match(html, new RegExp(`${asset.replace('.', '\\.')}\\?v=20260929-torque-tube-cut-lengths`));
   }
 });
 
@@ -78,4 +78,88 @@ test('estimation-mode Reset restores the default Max Span Length', () => {
   assert.equal(engine.getSpanLimits(project)[2], 24300);
   project.inputs.max_span_length = engine.DEFAULT_INPUTS.max_span_length;
   assert.equal(engine.getSpanLimits(project)[2], 21330);
+});
+
+test('Array Table shows Number of Trackers as read-only and leaves zero quantities blank',()=>{
+  const app=read('app.js');
+  assert.match(app,/trackerQuantity>0\?trackerQuantity:''/);
+  assert.match(app,/Tracker quantities are managed in Inputs under Bearing Pile Distance by Array Type/);
+  assert.doesNotMatch(app,/function editArrayQtyCell/);
+});
+
+test('pile contingency applies only to Drive Pile and Bearing Pile totals',()=>{
+  const engine=loadEngine(),project={
+    inputs:{...engine.DEFAULT_INPUTS},manual_parts:{},soltrk_version:'3.0',equipment_quantity_overrides:{},
+    contingency_enabled:false,fastener_contingency_percent:0,pile_contingency_enabled:true,pile_contingency_percent:10,bom_metadata_enabled:true,
+  };
+  const schedule=[{'PV Modules per Tracker':20,'Number of Trackers':2,'Bearing Posts / Tracker':3,'Module Support Plates / Tracker':0,'Bearing 100 / Tracker':0,'Bearing 110 / Tracker':0,'Bearing 120 / Tracker':0,'Tracker Type':'Short','Main Tube C Required Length North':0,'Main Tube C Required Length South':0,_schedule_key:'20:default'}];
+  const parts=[
+    {Part:'Drive Pile',TAG:'k050346',Description:'Drive pile',Category:'Steel Structure / Post',Unit:'pcs'},
+    {Part:'Bearing Pile',TAG:'k060326',Description:'Bearing pile',Category:'Steel Structure / Post',Unit:'pcs'},
+    {Part:'Bearing Adapter',TAG:'k001119',Description:'Bearing adapter',Category:'Steel Structure / Substructure',Unit:'pcs'},
+  ];
+  const result=engine.buildProjectBom(project,schedule,parts,engine.PART_COLUMNS),byName=name=>result.rows.find(row=>row['Part Name']===name);
+  assert.equal(byName('Drive Pile')['Total Qty'],3);
+  assert.equal(byName('Bearing Pile')['Total Qty'],7);
+  assert.equal(byName('Bearing Adapter')['Total Qty'],6);
+  assert.equal(byName('Drive Pile')['Contingency (%)'],10);
+  assert.equal(byName('Bearing Adapter')['Contingency (%)'],0);
+});
+
+test('new projects default to SOLTRK 3.0 while explicit 2.0 remains supported',()=>{
+  const engine=loadEngine(),app=read('app.js');
+  assert.equal(engine.normalizeSoltrkVersion(undefined),'3.0');
+  assert.equal(engine.normalizeSoltrkVersion('2.0'),'2.0');
+  assert.match(app,/soltrk_version:'3\.0'/);
+  assert.match(app,/p\.soltrk_version='3\.0'/);
+});
+
+test('Module Rail Elevation Plate is optional, excluded by default, and keeps its existing quantity formula',()=>{
+  const engine=loadEngine();
+  const project={
+    inputs:{...engine.DEFAULT_INPUTS},manual_parts:{},soltrk_version:'3.0',equipment_quantity_overrides:{},
+    contingency_enabled:false,pile_contingency_enabled:false,bom_metadata_enabled:true,
+    module_rail_elevation_plate_included:false,
+  };
+  const schedule=[{'PV Modules per Tracker':20,'Number of Trackers':3,'Bearing 100 / Tracker':2,'Bearing 110 / Tracker':0,'Bearing 120 / Tracker':0,'Bearing Posts / Tracker':2,'Module Support Plates / Tracker':0,'Tracker Type':'Short','Main Tube C Required Length North':0,'Main Tube C Required Length South':0,_schedule_key:'20:default'}];
+  const parts=[{Part:'Module Rail Elevation Plate',TAG:'k001573',Description:'PV rail raiser',Category:'Steel Structure / Substructure',Unit:'pcs'}];
+  const excluded=engine.buildProjectBom(project,schedule,parts,engine.PART_COLUMNS);
+  assert.equal(excluded.rows.some(row=>row.TAG==='k001573'),false);
+  project.module_rail_elevation_plate_included=true;
+  const included=engine.buildProjectBom(project,schedule,parts,engine.PART_COLUMNS);
+  assert.equal(included.rows.find(row=>row.TAG==='k001573')['Total Qty'],12);
+  const app=read('app.js');
+  assert.match(app,/module_rail_elevation_plate_included:false/);
+  assert.match(app,/id="bomModuleRailElevationPlate"/);
+  assert.match(app,/project\.module_rail_elevation_plate_included=event\.target\.checked/);
+});
+
+test('array types start at 12 PV modules and continue through 56 with unchanged scheduling',()=>{
+  const engine=loadEngine(),quantities=engine.defaultTrackerQuantities();
+  assert.deepEqual(Object.keys(quantities),Array.from({length:45},(_,index)=>String(index+12)));
+  const schedule=engine.buildSchedule({inputs:{...engine.DEFAULT_INPUTS},tracker_quantities:quantities,bearing_rules:{}});
+  assert.equal(schedule.length,45);
+  assert.equal(schedule[0]['PV Modules per Tracker'],12);
+  assert.equal(schedule.at(-1)['PV Modules per Tracker'],56);
+  const app=read('app.js');
+  assert.match(app,/Array\.from\(\{length:45\},\(_,i\)=>i\+12\)/);
+  assert.match(app,/customRule:\{pv:'12'/);
+});
+
+test('Selected Arrays shows Torque Tube B and exact plus upward-rounded Torque Tube C cut lengths',()=>{
+  const engine=loadEngine(),project={inputs:{...engine.DEFAULT_INPUTS}};
+  assert.equal(engine.roundUpToTenMm(4221),4230);
+  assert.equal(engine.roundUpToTenMm(5687),5690);
+  assert.equal(engine.roundUpToTenMm(5690),5690);
+  const geometry=engine.calculateTrackerGeometry(project,22);
+  assert.equal(geometry['Torque Tube B Length (mm)'],Number(engine.DEFAULT_INPUTS.main_beam_b_length));
+  assert.equal(geometry['Torque Tube C Exact Cut Length (mm)'],geometry['Main Tube C Required Length']);
+  assert.equal(geometry['Torque Tube C Rounded Cut Length (mm)']%10,0);
+  assert.ok(geometry['Torque Tube C Rounded Cut Length (mm)']>=geometry['Torque Tube C Exact Cut Length (mm)']);
+  assert.ok(geometry['Torque Tube C Rounded Cut Length (mm)']-geometry['Torque Tube C Exact Cut Length (mm)']<10);
+  const app=read('app.js');
+  assert.match(app,/SELECTED_ARRAY_COLUMNS[\s\S]*'Torque Tube B Length \(mm\)'/);
+  assert.match(app,/SELECTED_ARRAY_COLUMNS[\s\S]*'Torque Tube C Exact Cut Length \(mm\)'/);
+  assert.match(app,/SELECTED_ARRAY_COLUMNS[\s\S]*'Torque Tube C Rounded Cut Length \(mm\)'/);
+  assert.match(app,/Exact: \$\{displayValue\(r\['Torque Tube C Exact Cut Length \(mm\)'\]\)\} \/ Rounded:/);
 });

@@ -34,7 +34,7 @@ test('Tube Spacer is a Fasteners item with the requested description and linked 
   assert.match(read('engine.js'),/\['k001479 - Tube Spacer',r=>2\*torqueTubeConnectionFastenersForRow\(r\)/);
 });
 
-test('Excel export borders every filled cell and keeps complete Project BOM row borders',async()=>{
+test('Excel export borders the complete occupied range on every sheet',async()=>{
   const context=vm.createContext({Blob,TextEncoder,Uint8Array});
   vm.runInContext(read('xlsx-lite.js'),context,{filename:'xlsx-lite.js'});
   const blob=context.XlsxLite.createWorkbookBlob([
@@ -42,20 +42,23 @@ test('Excel export borders every filled cell and keeps complete Project BOM row 
     {name:'Project BOM',rows:[
       ['TAG','Category','Total Qty'],
       ['k001152','Steel Structure / Post',2],
-      ['k001479','Fasteners / Main Tube - Main Tube'],
       ['k001393','Limit Switch',4],
-    ],rowStyles:[null,'steelStructure','fasteners',null],borderEveryCell:true},
+      ['k001479','Fasteners / Main Tube - Main Tube'],
+      ['manual','Unclassified',1],
+    ],rowStyles:[null,'steelStructure','otherParts','fasteners',null],borderEveryCell:true},
   ]);
   const files=storedZipFiles(await blob.arrayBuffer());
   const styles=files.get('xl/styles.xml');
   const summary=files.get('xl/worksheets/sheet1.xml');
   const bom=files.get('xl/worksheets/sheet2.xml');
   assert.ok(styles&&summary&&bom);
-  assert.match(styles,/fgColor rgb="FFDDEFF8"/);
+  assert.match(styles,/fgColor rgb="FFB4C6E7"/);
+  assert.match(styles,/fgColor rgb="FFC6E0B4"/);
   assert.match(styles,/fgColor rgb="FFFFF2CE"/);
+  assert.match(styles,/<left style="thin"><color rgb="FF000000"\/><\/left>/);
   const borderedStyles=[...styles.matchAll(/<xf numFmtId="0" fontId="\d" fillId="\d" borderId="1"[^>]*>/g)];
-  assert.equal(borderedStyles.length,4,'all export cell styles must use the thin border');
-  for(const [row,style] of [[1,1],[2,3],[3,4],[4,2]]){
+  assert.equal(borderedStyles.length,5,'all export cell styles must use the thin border');
+  for(const [row,style] of [[1,1],[2,3],[3,5],[4,4],[5,2]]){
     const rowXml=bom.match(new RegExp(`<row r="${row}">([\\s\\S]*?)<\\/row>`))?.[1];
     assert.ok(rowXml,`Project BOM row ${row} is present`);
     for(const column of ['A','B','C'])assert.match(rowXml,new RegExp(`<c r="${column}${row}" s="${style}"`));
@@ -63,6 +66,10 @@ test('Excel export borders every filled cell and keeps complete Project BOM row 
   assert.match(summary,/<c r="A2" s="2"/);
   assert.match(summary,/<c r="B3" s="2" t="n"><v>0<\/v>/,'numeric zero is a filled bordered cell');
   assert.match(summary,/<c r="C3" s="2"/,'filled text receives the simple border');
-  assert.match(summary,/<c r="C2" s="0"/,'an intentionally blank non-BOM cell is not bordered');
-  assert.match(read('app.js'),/rowStyles:bomRowStyles,borderEveryCell:true/);
+  assert.match(summary,/<c r="C2" s="2"/,'an intentionally blank cell inside the occupied sheet range is bordered');
+  const appSource=read('app.js');
+  for(const sheetName of ['Project Summary','Inputs','Custom Bearing Rules','Selected Arrays','Project BOM']){
+    assert.match(appSource,new RegExp(`name:'${sheetName.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')}'[^}]*borderEveryCell:true`));
+  }
+  assert.match(appSource,/return 'otherParts'/);
 });
